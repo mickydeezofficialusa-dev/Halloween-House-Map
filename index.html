@@ -11,41 +11,22 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    html, body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #09090b;
-      color: #f4f4f5;
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      height: 100dvh;
-      overflow: hidden;
-      position: fixed;
-      inset: 0;
-      -webkit-font-smoothing: antialiased;
-    }
-
+    html, body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #09090b; color: #f4f4f5; margin: 0; padding: 0; width: 100%; height: 100%; height: 100dvh; overflow: hidden; position: fixed; inset: 0; -webkit-font-smoothing: antialiased; }
     .safe-top { padding-top: env(safe-area-inset-top, 0px); }
     .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
     .map-controls-bottom { bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); }
-
     #introSplash { transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1); }
     #introSplash.hide-splash { opacity: 0; transform: scale(1.06); pointer-events: none; }
-
     @keyframes ghostFloat { 0%, 100% { transform: translateY(0) rotate(-3deg) scale(1); } 50% { transform: translateY(-14px) rotate(4deg) scale(1.05); } }
     @keyframes booPop { 0% { opacity: 0; transform: scale(0.4) translateY(20px); } 60% { opacity: 1; transform: scale(1.12) translateY(-4px); } 80% { transform: scale(0.96) translateY(0); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
     @keyframes creditsRise { 0% { opacity: 0; transform: translateY(18px); } 100% { opacity: 1; transform: translateY(0); } }
-    @keyframes batFlyLeft { 0% { transform: translate(0, 0) rotate(-10deg) scale(0.8); opacity: 0; } 20% { opacity: 0.85; } 100% { transform: translate(-150px, -110px) rotate(-22deg) scale(1.15); opacity: 0; } }
-    @keyframes batFlyRight { 0% { transform: translate(0, 0) rotate(12deg) scale(0.8); opacity: 0; } 20% { opacity: 0.85; } 100% { transform: translate(150px, -120px) rotate(24deg) scale(1.15); opacity: 0; } }
-    @keyframes emberRise { 0% { transform: translateY(30px) scale(0.5); opacity: 0; } 40% { opacity: 0.75; } 100% { transform: translateY(-130px) scale(1.2); opacity: 0; } }
     @keyframes candyFall { 0% { transform: translateY(-12vh) translateX(0) rotate(0deg) scale(0.8); opacity: 1; } 85% { opacity: 1; } 100% { transform: translateY(112vh) translateX(var(--drift, 40px)) rotate(var(--spin, 540deg)) scale(1.1); opacity: 0; } }
     @keyframes ghostSweep { 0% { transform: translateX(-15vw) translateY(0) scale(0.8); opacity: 0; } 15% { opacity: 0.95; } 50% { transform: translateX(50vw) translateY(-35px) scale(1.15); } 85% { opacity: 0.95; } 100% { transform: translateX(115vw) translateY(15px) scale(0.9); opacity: 0; } }
     @keyframes welcomePop { 0% { opacity: 0; transform: scale(0.3) rotate(-8deg); } 60% { opacity: 1; transform: scale(1.08) rotate(3deg); } 80% { transform: scale(0.96) rotate(-1deg); } 100% { opacity: 1; transform: scale(1) rotate(0deg); } }
-
+    @keyframes dashFlow { to { stroke-dashoffset: -36; } }
+    .trail-line-anim { animation: dashFlow 1s linear infinite; }
     .candy-drop { position: fixed; top: -60px; pointer-events: none; z-index: 9500; animation: candyFall var(--dur, 3.5s) cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; }
     .ghost-flyer { position: fixed; left: -80px; pointer-events: none; z-index: 9500; animation: ghostSweep var(--dur, 4.2s) ease-in-out forwards; }
     .animate-welcome-pop { animation: welcomePop 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
@@ -53,26 +34,20 @@
     .animate-boo { animation: booPop 0.85s cubic-bezier(0.34, 1.56, 0.64, 1) 0.25s both; }
     .animate-credits-1 { animation: creditsRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.85s both; }
     .animate-credits-2 { animation: creditsRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 1.15s both; }
-    .animate-bat-l { animation: batFlyLeft 3.4s ease-out 0.2s infinite; }
-    .animate-bat-r { animation: batFlyRight 3.6s ease-out 0.6s infinite; }
-    .ember-particle { animation: emberRise 3.2s ease-in-out infinite; }
-
-    input[type="range"].volume-slider { -webkit-appearance: none; appearance: none; width: 64px; height: 4px; background: #27272a; border-radius: 999px; outline: none; cursor: pointer; }
-    input[type="range"].volume-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #f97316; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.6); transition: transform 0.15s ease; }
-
-    .leaflet-fade-anim .leaflet-tile, .leaflet-zoom-anim .leaflet-zoom-animated { will-change: transform, opacity; transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s linear !important; }
+    input[type="range"].volume-slider { -webkit-appearance: none; appearance: none; width: 52px; height: 4px; background: #27272a; border-radius: 999px; outline: none; cursor: pointer; }
+    input[type="range"].volume-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #f97316; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.6); }
     .leaflet-container { background: #09090b !important; width: 100%; height: 100%; }
     .carto-voyager-dark { filter: invert(100%) hue-rotate(180deg) brightness(94%) contrast(92%) saturate(80%); }
-
-    .custom-pin { display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; background: #18181b; border: 2px solid #f97316; border-radius: 13px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.85), 0 0 0 4px rgba(249,115,22,0.22); transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1); }
+    .custom-pin { position: relative; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; background: #18181b; border: 2px solid #f97316; border-radius: 13px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.85), 0 0 0 4px rgba(249,115,22,0.22); transition: transform 0.2s ease; }
     .custom-pin:hover { transform: scale(1.16) translateY(-3px); border-color: #fb923c; z-index: 999 !important; }
     .custom-pin span { font-size: 19px; line-height: 1; }
-    .pin-out-of-candy { background: #09090b; border-color: #3f3f46; box-shadow: 0 4px 12px rgba(0,0,0,0.6); opacity: 0.6; }
+    .pin-out-of-candy { background: #09090b; border-color: #3f3f46; opacity: 0.6; }
+    .pin-in-trail { border-color: #10b981 !important; box-shadow: 0 0 0 5px rgba(16,185,129,0.35), 0 10px 25px rgba(0,0,0,0.9) !important; }
+    .trail-badge { position: absolute; top: -7px; right: -7px; width: 18px; height: 18px; border-radius: 999px; background: #10b981; color: #052e16; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid #09090b; }
     .user-gps-dot { width: 18px; height: 18px; background: #3b82f6; border: 3px solid #fff; border-radius: 9999px; box-shadow: 0 0 0 6px rgba(59,130,246,0.35), 0 4px 10px rgba(0,0,0,0.5); }
-
     .leaflet-popup-content-wrapper { background: #121215 !important; color: #f4f4f5 !important; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px !important; padding: 0 !important; overflow: hidden; box-shadow: 0 24px 48px -12px rgba(0,0,0,0.9) !important; }
-    .leaflet-popup-content { margin: 0 !important; width: 275px !important; }
-    .leaflet-popup-tip { background: #121215 !important; border: 1px solid rgba(255,255,255,0.08); }
+    .leaflet-popup-content { margin: 0 !important; width: 280px !important; }
+    .leaflet-popup-tip { background: #121215 !important; }
     .leaflet-container a.leaflet-popup-close-button { color: #a1a1aa !important; background: rgba(9,9,11,0.75) !important; border-radius: 9999px; width: 26px !important; height: 26px !important; top: 8px !important; right: 8px !important; display: flex; align-items: center; justify-content: center; z-index: 10; }
     .leaflet-bar { border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 12px !important; overflow: hidden; }
     .leaflet-bar a { background-color: #121215 !important; color: #e4e4e7 !important; border-bottom: 1px solid rgba(255,255,255,0.08) !important; }
@@ -84,27 +59,27 @@
 </head>
 <body class="flex flex-col select-none bg-[#09090b] text-zinc-100">
 
-  <!-- ADMIN-SYNCED GLOBAL FX LAYER (CANDY RAIN & GHOST PARADE) -->
+  <!-- GLOBAL FX LAYER -->
   <div id="fxLayer" class="fixed inset-0 pointer-events-none z-[9500] overflow-hidden"></div>
 
-  <!-- ADMIN-SYNCED "YOU'RE WELCOME!" GIANT PUMPKIN POPUP -->
+  <!-- GIANT PUMPKIN POPUP: "MESSAGE FROM THE CREATOR" -->
   <div id="welcomePumpkinOverlay" onclick="hideWelcomePumpkin()" class="hidden fixed inset-0 z-[9600] bg-black/75 backdrop-blur-md flex items-center justify-center p-5 cursor-pointer">
     <div class="animate-welcome-pop relative max-w-sm w-full bg-gradient-to-b from-zinc-900 via-zinc-900 to-zinc-950 border-2 border-orange-500/60 rounded-3xl p-6 text-center shadow-[0_0_80px_rgba(249,115,22,0.45)]">
       <div class="w-24 h-24 mx-auto rounded-3xl bg-orange-500/15 border border-orange-500/40 flex items-center justify-center text-6xl mb-4 animate-ghost shadow-inner">🎃</div>
-      <span class="inline-block px-3 py-1 rounded-full bg-orange-500/20 border border-orange-500/40 text-orange-300 text-[10px] font-bold uppercase tracking-widest mb-2">SpookyMap UAE Special</span>
-      <h2 class="text-2xl sm:text-4xl font-extrabold bg-gradient-to-r from-white via-orange-200 to-orange-500 bg-clip-text text-transparent">You're Welcome! 🎃</h2>
+      <span class="inline-block px-3 py-1 rounded-full bg-orange-500/20 border border-orange-500/40 text-orange-300 text-[10px] font-bold uppercase tracking-widest mb-2">SpookyMap UAE Official</span>
+      <h2 id="welcomePumpkinTitle" class="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-white via-orange-200 to-orange-500 bg-clip-text text-transparent">Message from the Creator 🎃</h2>
       <p id="welcomePumpkinSub" class="text-xs sm:text-sm text-zinc-300 mt-2 leading-relaxed">Happy Trick-or-Treating across the UAE! Stay safe & enjoy the candy! 🍬✨</p>
       <p class="text-[10px] text-zinc-500 mt-4">Tap anywhere to dismiss</p>
     </div>
   </div>
 
-  <!-- ADMIN-SYNCED LIVE BROADCAST BANNER -->
+  <!-- LIVE BROADCAST BANNER: "MESSAGE FROM THE CREATOR" -->
   <div id="liveBroadcastBanner" class="hidden fixed top-16 left-1/2 -translate-x-1/2 z-[9400] w-[92%] max-w-lg bg-gradient-to-r from-orange-500 via-amber-500 to-orange-500 p-0.5 rounded-2xl shadow-[0_15px_40px_rgba(249,115,22,0.4)]">
     <div class="bg-[#121215]/95 backdrop-blur-xl rounded-[14px] px-3.5 py-2.5 flex items-center justify-between gap-2.5">
       <div class="flex items-center gap-2.5 min-w-0">
         <span class="w-8 h-8 rounded-xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center text-base shrink-0 animate-bounce">🎃</span>
         <div class="min-w-0">
-          <p class="text-[9px] font-bold uppercase tracking-wider text-orange-400">Live Announcement</p>
+          <p class="text-[9px] font-bold uppercase tracking-wider text-orange-400">Message from the Creator</p>
           <p id="liveBroadcastText" class="text-xs font-semibold text-white break-words"></p>
         </div>
       </div>
@@ -112,24 +87,37 @@
     </div>
   </div>
 
+  <!-- FIRST-TIME DEVICE TUTORIAL MODAL (WITH SKIP BUTTON) -->
+  <div id="tutorialModal" class="hidden fixed inset-0 z-[9800] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 safe-top safe-bottom">
+    <div class="bg-[#121215] border border-orange-500/30 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 text-center">
+      <div class="flex items-center justify-between">
+        <span id="tutStepBadge" class="px-2.5 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/30 text-orange-400 text-[10px] font-bold uppercase tracking-wider">Step 1 of 4</span>
+        <button onclick="finishTutorial()" class="text-xs font-semibold text-zinc-400 hover:text-white px-2.5 py-1 rounded-lg bg-zinc-900 border border-white/10">Skip ✕</button>
+      </div>
+      <div id="tutIcon" class="w-20 h-20 mx-auto rounded-3xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-5xl">🎃</div>
+      <div class="space-y-1.5">
+        <h3 id="tutTitle" class="text-base font-extrabold text-white">Explore UAE Halloween Houses</h3>
+        <p id="tutDesc" class="text-xs text-zinc-400 leading-relaxed">Switch between any UAE community or Emirate at the top to find decorated villas giving out candy near you.</p>
+      </div>
+      <div class="flex items-center justify-center gap-1.5" id="tutDots"></div>
+      <div class="flex gap-2 pt-1">
+        <button onclick="finishTutorial()" class="flex-1 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold text-xs transition">Skip Tutorial</button>
+        <button onclick="nextTutorialStep()" id="tutNextBtn" class="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-400 text-zinc-950 font-bold text-xs transition">Next →</button>
+      </div>
+    </div>
+  </div>
+
   <!-- OPENING "BOO!" SPLASH ANIMATION + CREDITS -->
   <div id="introSplash" onclick="dismissSplash(true)" class="fixed inset-0 z-[9999] bg-[#09090b] flex flex-col items-center justify-center p-5 overflow-hidden cursor-pointer safe-top safe-bottom">
     <div class="absolute w-72 h-72 rounded-full bg-orange-500/15 blur-[90px] pointer-events-none"></div>
     <div class="absolute w-56 h-56 rounded-full bg-purple-500/10 blur-[80px] pointer-events-none"></div>
-    <div class="ember-particle absolute bottom-1/4 left-1/4 w-2 h-2 rounded-full bg-orange-400 blur-[1px]" style="animation-delay:0.1s"></div>
-    <div class="ember-particle absolute bottom-1/3 right-1/4 w-2.5 h-2.5 rounded-full bg-amber-300 blur-[1px]" style="animation-delay:0.7s"></div>
-
     <div class="relative flex flex-col items-center text-center max-w-sm z-10">
-      <span class="animate-bat-l absolute -top-4 -left-10 text-xl pointer-events-none">🦇</span>
-      <span class="animate-bat-r absolute -top-5 -right-10 text-xl pointer-events-none">🦇</span>
       <div class="animate-ghost w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-zinc-900/90 border border-orange-500/30 shadow-2xl shadow-orange-500/20 flex items-center justify-center text-5xl sm:text-6xl mb-3">👻</div>
-
       <div class="animate-boo">
         <span class="inline-block px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[10px] font-semibold tracking-widest uppercase mb-1.5">Welcome to SpookyMap UAE</span>
         <h1 class="text-4xl sm:text-6xl font-extrabold tracking-tight bg-gradient-to-br from-white via-orange-200 to-orange-500 bg-clip-text text-transparent">BOO! 🎃</h1>
         <p class="text-xs text-zinc-400 mt-1.5">UAE-Wide Halloween Trick-or-Treat Tracker</p>
       </div>
-
       <div class="animate-credits-1 mt-6 pt-5 border-t border-white/[0.08] w-full">
         <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500 mb-2.5">Created By</p>
         <div class="flex flex-wrap items-center justify-center gap-2">
@@ -137,7 +125,6 @@
           <span class="px-3 py-1.5 rounded-xl bg-zinc-900/90 border border-orange-500/25 text-xs font-semibold text-orange-300 flex items-center gap-1.5"><span>✨</span> Gemini Argon</span>
         </div>
       </div>
-
       <div class="animate-credits-2 mt-6">
         <button onclick="dismissSplash(true)" class="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-400 active:scale-95 text-zinc-950 font-bold text-xs shadow-lg shadow-orange-500/25 transition flex items-center gap-2">
           <span>Enter UAE Map & Start Music</span>
@@ -172,20 +159,30 @@
         </div>
       </div>
 
-      <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
-        <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-900 border border-white/[0.08]">
-          <button onclick="toggleMute()" id="muteBtn" class="text-zinc-300 hover:text-orange-400 transition flex items-center justify-center"><i id="volumeIcon" data-lucide="volume-2" class="w-3.5 h-3.5 text-orange-400"></i></button>
+      <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
+        <!-- Audio Controls + Next Song Button -->
+        <div class="flex items-center gap-1.5 px-2 py-1.5 rounded-xl bg-zinc-900 border border-white/[0.08]">
+          <button onclick="toggleMute()" id="muteBtn" title="Mute / Unmute" class="text-zinc-300 hover:text-orange-400 transition flex items-center justify-center"><i id="volumeIcon" data-lucide="volume-2" class="w-3.5 h-3.5 text-orange-400"></i></button>
           <input id="volumeSlider" type="range" min="0" max="100" value="35" oninput="handleVolumeChange(this.value)" class="volume-slider hidden sm:block" />
+          <button onclick="nextMusicTrack()" id="trackBtn" title="Switch Halloween Song (4 Tracks)" class="text-[10px] font-semibold text-zinc-300 hover:text-orange-400 pl-1 border-l border-white/10 flex items-center gap-1">
+            <span>🎵</span><span id="trackNumLabel" class="hidden xl:inline">Song 1</span>
+          </button>
         </div>
 
-        <button onclick="playClickSfx(); locateUser()" id="nearMeBtn" title="Near Me" class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 active:scale-95 text-zinc-300 border border-white/[0.08] transition flex items-center gap-1.5 text-xs font-medium">
-          <i data-lucide="navigation" class="w-3.5 h-3.5 text-orange-400"></i>
-          <span id="nearMeText" class="hidden sm:inline">Near Me</span>
+        <button onclick="playClickSfx(); openSidebarTab('trail')" class="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 transition flex items-center gap-1 text-xs font-semibold" title="My Trick-or-Treat Route">
+          <span>🗺️</span>
+          <span class="hidden sm:inline">Trail</span>
+          <span>(<span id="headerTrailCount">0</span>)</span>
         </button>
 
-        <button onclick="playClickSfx(); startAddHouseMode()" id="addHouseBtn" class="px-3 sm:px-3.5 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-400 active:scale-95 text-zinc-950 font-semibold text-xs transition flex items-center gap-1 shadow-lg shadow-orange-500/15">
+        <button onclick="playClickSfx(); locateUser()" id="nearMeBtn" title="Near Me" class="px-2.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 active:scale-95 text-zinc-300 border border-white/[0.08] transition flex items-center gap-1 text-xs font-medium">
+          <i data-lucide="navigation" class="w-3.5 h-3.5 text-orange-400"></i>
+          <span id="nearMeText" class="hidden lg:inline">Near Me</span>
+        </button>
+
+        <button onclick="playClickSfx(); startAddHouseMode()" id="addHouseBtn" class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-400 active:scale-95 text-zinc-950 font-semibold text-xs transition flex items-center gap-1 shadow-lg shadow-orange-500/15">
           <i data-lucide="plus" class="w-3.5 h-3.5 stroke-[2.5]"></i>
-          <span>Add House</span>
+          <span>Add</span>
         </button>
       </div>
     </div>
@@ -201,43 +198,75 @@
     </div>
     <button onclick="playClickSfx(); toggleMobileDrawer()" class="px-2.5 py-1.5 rounded-xl bg-zinc-900 border border-white/[0.08] text-[11px] font-medium text-zinc-200 flex items-center gap-1 active:scale-95 transition shrink-0">
       <i data-lucide="list" class="w-3.5 h-3.5 text-orange-400"></i>
-      <span>List (<span id="mobileCount">0</span>)</span>
+      <span>Houses (<span id="mobileCount">0</span>)</span>
     </button>
   </div>
 
   <!-- MAIN WORKSPACE -->
   <div class="flex-1 flex relative overflow-hidden min-h-0">
     <aside id="sidebar" class="smooth-drawer w-full sm:w-80 lg:w-96 bg-[#0c0c0f] border-r border-white/[0.08] flex flex-col z-20 absolute sm:relative inset-0 transform -translate-x-full sm:translate-x-0 safe-bottom">
-      <div class="p-3.5 border-b border-white/[0.07] space-y-2.5 shrink-0">
-        <div class="flex items-center justify-between sm:hidden">
-          <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">UAE Halloween Houses</span>
-          <button onclick="playClickSfx(); toggleMobileDrawer()" class="text-zinc-400 hover:text-white p-1"><i data-lucide="x" class="w-4 h-4"></i></button>
+      
+      <!-- Sidebar Mode Switcher: Houses vs My Trail -->
+      <div class="p-3 border-b border-white/[0.07] flex items-center justify-between gap-1.5 bg-[#09090b] shrink-0">
+        <div class="flex gap-1 flex-1 bg-zinc-900 p-1 rounded-xl border border-white/[0.06]">
+          <button onclick="switchSidebarMode('houses')" id="sideTab-houses" class="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-zinc-800 text-white transition">
+            🏠 Houses (<span id="houseCount">0</span>)
+          </button>
+          <button onclick="switchSidebarMode('trail')" id="sideTab-trail" class="flex-1 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition">
+            🗺️ My Trail (<span id="sidebarTrailCount">0</span>)
+          </button>
         </div>
-        <div class="relative">
-          <i data-lucide="search" class="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
-          <input id="searchInput" oninput="renderUI()" type="text" placeholder="Search community, cluster, villa #..." class="w-full pl-9 pr-3 py-2 bg-zinc-900/90 border border-white/[0.08] rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500/60" />
-        </div>
-        <select id="communityFilterSelect" onchange="playClickSfx(); renderUI()" class="w-full px-3 py-1.5 bg-zinc-900/90 border border-white/[0.08] rounded-xl text-xs text-zinc-300 focus:outline-none focus:border-orange-500/60">
-          <option value="all">🌍 Showing All UAE Communities</option>
-        </select>
-        <div class="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar text-[11px]">
-          <button onclick="playClickSfx(); setFilter('all')" id="filter-all" class="filter-pill px-2.5 py-1 rounded-lg bg-zinc-800 text-white border border-white/10 font-medium shrink-0">All</button>
-          <button onclick="playClickSfx(); setFilter('candy')" id="filter-candy" class="filter-pill px-2.5 py-1 rounded-lg bg-zinc-900 text-zinc-400 border border-white/[0.05] shrink-0">🍬 Has Candy</button>
-          <button onclick="playClickSfx(); setFilter('allergy')" id="filter-allergy" class="filter-pill px-2.5 py-1 rounded-lg bg-zinc-900 text-zinc-400 border border-white/[0.05] shrink-0">🥜 Allergy Safe</button>
-          <button onclick="playClickSfx(); setFilter('scary')" id="filter-scary" class="filter-pill px-2.5 py-1 rounded-lg bg-zinc-900 text-zinc-400 border border-white/[0.05] shrink-0">👻 Scary</button>
-        </div>
+        <button onclick="playClickSfx(); toggleMobileDrawer()" class="sm:hidden text-zinc-400 hover:text-white p-1.5"><i data-lucide="x" class="w-4 h-4"></i></button>
       </div>
 
-      <div class="px-4 py-2 bg-[#09090b] border-b border-white/[0.05] flex items-center justify-between text-[11px] text-zinc-400 shrink-0">
-        <span><strong id="houseCount" class="text-zinc-200 font-semibold">0</strong> Halloween houses</span>
-        <button onclick="playClickSfx(); fetchHousesFromSupabase()" class="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1"><i data-lucide="refresh-cw" class="w-3 h-3"></i> Sync</button>
+      <!-- TAB 1: HOUSES LIST -->
+      <div id="sidebarHousesPanel" class="flex-1 flex flex-col min-h-0">
+        <div class="p-3 border-b border-white/[0.07] space-y-2 shrink-0">
+          <div class="relative">
+            <i data-lucide="search" class="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+            <input id="searchInput" oninput="renderUI()" type="text" placeholder="Search community, cluster, villa #..." class="w-full pl-9 pr-3 py-2 bg-zinc-900/90 border border-white/[0.08] rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500/60" />
+          </div>
+          <select id="communityFilterSelect" onchange="playClickSfx(); renderUI()" class="w-full px-3 py-1.5 bg-zinc-900/90 border border-white/[0.08] rounded-xl text-xs text-zinc-300 focus:outline-none focus:border-orange-500/60">
+            <option value="all">🌍 Showing All UAE Communities</option>
+          </select>
+          <div class="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar text-[11px]">
+            <button onclick="playClickSfx(); setFilter('all')" id="filter-all" class="filter-pill px-2.5 py-1 rounded-lg bg-zinc-800 text-white border border-white/10 font-medium shrink-0">All</button>
+            <button onclick="playClickSfx(); setFilter('candy')" id="filter-candy" class="filter-pill px-2.5 py-1 rounded-lg bg-zinc-900 text-zinc-400 border border-white/[0.05] shrink-0">🍬 Has Candy</button>
+            <button onclick="playClickSfx(); setFilter('allergy')" id="filter-allergy" class="filter-pill px-2.5 py-1 rounded-lg bg-zinc-900 text-zinc-400 border border-white/[0.05] shrink-0">🥜 Allergy Safe</button>
+            <button onclick="playClickSfx(); setFilter('scary')" id="filter-scary" class="filter-pill px-2.5 py-1 rounded-lg bg-zinc-900 text-zinc-400 border border-white/[0.05] shrink-0">👻 Scary</button>
+          </div>
+        </div>
+        <div id="houseList" class="flex-1 overflow-y-auto p-3 space-y-2 scroll-smooth min-h-0"></div>
       </div>
 
-      <div id="houseList" class="flex-1 overflow-y-auto p-3 space-y-2 scroll-smooth min-h-0"></div>
+      <!-- TAB 2: TRICK-OR-TREAT ROUTE / TRAIL BUILDER -->
+      <div id="sidebarTrailPanel" class="hidden flex-1 flex flex-col min-h-0">
+        <div class="p-3.5 border-b border-white/[0.07] bg-emerald-500/5 space-y-2.5 shrink-0">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-xs font-bold text-emerald-300">🗺️ Trick-or-Treat Trail</h3>
+              <p id="trailDistanceText" class="text-[11px] text-zinc-400">Tap "+ Trail" on any house to build your route</p>
+            </div>
+            <button onclick="clearTrail()" class="px-2 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white text-[10px] font-semibold border border-white/10">Clear</button>
+          </div>
+          <div class="grid grid-cols-2 gap-1.5">
+            <button onclick="optimizeTrailOrder()" class="py-2 px-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold transition">
+              ⚡ Auto-Sort Closest
+            </button>
+            <button onclick="openTrailInGoogleMaps()" class="py-2 px-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-[11px] transition">
+              🚶 Start Route ↗
+            </button>
+          </div>
+        </div>
+        <div id="trailList" class="flex-1 overflow-y-auto p-3 space-y-2 scroll-smooth min-h-0"></div>
+      </div>
 
       <div class="px-4 py-2 bg-[#09090b] border-t border-white/[0.05] text-[10px] text-zinc-500 flex items-center justify-between shrink-0">
         <span>By Amaan Hakim & Gemini Argon</span>
-        <button onclick="replayIntro()" class="text-orange-400 hover:underline">Replay Intro</button>
+        <div class="flex items-center gap-2.5">
+          <button onclick="openTutorial()" class="text-zinc-400 hover:text-white">Tutorial</button>
+          <button onclick="replayIntro()" class="text-orange-400 hover:underline">Intro</button>
+        </div>
       </div>
     </aside>
 
@@ -263,9 +292,7 @@
     </main>
   </div>
 
-  <!-- ========================================================================= -->
-  <!-- MODAL 1: RATINGS, COMMENTS & "OUT OF CANDY" REPORTER                      -->
-  <!-- ========================================================================= -->
+  <!-- MODAL 1: RATINGS, COMMENTS & "OUT OF CANDY" REPORTER -->
   <div id="reviewsModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 safe-top safe-bottom">
     <div class="bg-[#121215] border border-white/10 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl max-h-[90dvh] flex flex-col">
       <div class="px-5 py-3.5 border-b border-white/[0.08] flex items-center justify-between shrink-0">
@@ -277,44 +304,33 @@
       </div>
 
       <div class="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
-        <!-- Quick Candy Status Reporter Area -->
         <div class="p-3 rounded-2xl bg-zinc-900/90 border border-white/[0.07] space-y-2">
           <div class="flex items-center justify-between">
-            <span class="text-[11px] font-semibold text-zinc-300">🍬 Update Live Candy Status:</span>
+            <span class="text-[11px] font-semibold text-zinc-300">🍬 Report Live Candy Status:</span>
             <span id="revCurrentStatusBadge" class="text-[10px]"></span>
           </div>
           <div class="grid grid-cols-3 gap-1.5 text-[11px]">
-            <button type="button" onclick="reportCandyStatus('plenty')" id="statusBtn-plenty" class="py-2 px-2 rounded-xl bg-zinc-950 hover:bg-emerald-500/15 border border-white/10 text-zinc-300 font-semibold transition">
-              🍬 Plenty
-            </button>
-            <button type="button" onclick="reportCandyStatus('low')" id="statusBtn-low" class="py-2 px-2 rounded-xl bg-zinc-950 hover:bg-amber-500/15 border border-white/10 text-zinc-300 font-semibold transition">
-              ⚡ Low
-            </button>
-            <button type="button" onclick="reportCandyStatus('out')" id="statusBtn-out" class="py-2 px-2 rounded-xl bg-zinc-950 hover:bg-red-500/15 border border-white/10 text-zinc-300 font-semibold transition">
-              💤 Out of Candy
-            </button>
+            <button type="button" onclick="reportCandyStatus('plenty')" id="statusBtn-plenty" class="py-2 px-2 rounded-xl bg-zinc-950 border border-white/10 text-zinc-300 font-semibold transition">🍬 Plenty</button>
+            <button type="button" onclick="reportCandyStatus('low')" id="statusBtn-low" class="py-2 px-2 rounded-xl bg-zinc-950 border border-white/10 text-zinc-300 font-semibold transition">⚡ Low</button>
+            <button type="button" onclick="reportCandyStatus('out')" id="statusBtn-out" class="py-2 px-2 rounded-xl bg-zinc-950 border border-white/10 text-zinc-300 font-semibold transition">💤 Out of Candy</button>
           </div>
         </div>
 
-        <!-- Leave a Star Rating & Comment Form -->
         <form onsubmit="submitHouseReview(event)" class="p-3.5 rounded-2xl bg-zinc-900/60 border border-white/[0.07] space-y-3">
           <div class="flex items-center justify-between">
             <label class="text-xs font-bold text-white">⭐ Rate & Leave a Comment</label>
             <span class="text-[10px] text-emerald-400 flex items-center gap-1"><i data-lucide="shield" class="w-3 h-3"></i> Family Filter</span>
           </div>
-
-          <!-- Interactive 1-5 Star Selector -->
           <div class="flex items-center gap-1.5" id="starSelector">
-            <button type="button" onclick="selectStarRating(1)" class="star-btn text-xl transition transform hover:scale-110">⭐</button>
-            <button type="button" onclick="selectStarRating(2)" class="star-btn text-xl transition transform hover:scale-110">⭐</button>
-            <button type="button" onclick="selectStarRating(3)" class="star-btn text-xl transition transform hover:scale-110">⭐</button>
-            <button type="button" onclick="selectStarRating(4)" class="star-btn text-xl transition transform hover:scale-110">⭐</button>
-            <button type="button" onclick="selectStarRating(5)" class="star-btn text-xl transition transform hover:scale-110">⭐</button>
+            <button type="button" onclick="selectStarRating(1)" class="star-btn text-xl">⭐</button>
+            <button type="button" onclick="selectStarRating(2)" class="star-btn text-xl">⭐</button>
+            <button type="button" onclick="selectStarRating(3)" class="star-btn text-xl">⭐</button>
+            <button type="button" onclick="selectStarRating(4)" class="star-btn text-xl">⭐</button>
+            <button type="button" onclick="selectStarRating(5)" class="star-btn text-xl">⭐</button>
             <span id="selectedStarText" class="text-xs font-semibold text-amber-400 ml-1.5">5 / 5 Stars</span>
           </div>
-
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <input id="reviewAuthorInput" type="text" maxlength="32" required placeholder="Your Name / Costume (e.g. Spider-Man)" class="w-full px-3 py-2 bg-zinc-950 border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500" />
+            <input id="reviewAuthorInput" type="text" maxlength="32" required placeholder="Your Name / Costume" class="w-full px-3 py-2 bg-zinc-950 border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500" />
             <select id="reviewCandyReport" class="w-full px-2.5 py-2 bg-zinc-950 border border-white/10 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-orange-500">
               <option value="">Candy Status (Optional)</option>
               <option value="plenty">🍬 Still has plenty of candy!</option>
@@ -322,15 +338,10 @@
               <option value="out">💤 Out of candy now</option>
             </select>
           </div>
-
           <textarea id="reviewCommentInput" rows="2" maxlength="180" required placeholder="Awesome decorations! Super friendly hosts..." class="w-full px-3 py-2 bg-zinc-950 border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500"></textarea>
-
-          <button type="submit" id="submitReviewBtn" class="w-full py-2 rounded-xl bg-orange-500 hover:bg-orange-400 active:scale-[0.99] text-zinc-950 font-bold text-xs transition">
-            Post Rating & Comment
-          </button>
+          <button type="submit" id="submitReviewBtn" class="w-full py-2 rounded-xl bg-orange-500 hover:bg-orange-400 text-zinc-950 font-bold text-xs transition">Post Rating & Comment</button>
         </form>
 
-        <!-- Existing Comments List -->
         <div class="space-y-2">
           <div class="flex items-center justify-between text-[11px] text-zinc-400 px-0.5">
             <span class="font-semibold uppercase tracking-wider">Trick-or-Treater Reviews</span>
@@ -342,20 +353,16 @@
     </div>
   </div>
 
-  <!-- ========================================================================= -->
-  <!-- MODAL 2: ADD HOUSE                                                        -->
-  <!-- ========================================================================= -->
+  <!-- MODAL 2: ADD HOUSE -->
   <div id="houseModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 safe-top safe-bottom">
     <div class="bg-[#121215] border border-white/10 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl max-h-[90dvh] flex flex-col">
       <div class="px-5 py-3.5 border-b border-white/[0.08] flex items-center justify-between shrink-0">
         <div class="flex items-center gap-2"><span class="text-lg">🎃</span><h2 class="text-sm font-semibold text-white">Add UAE Halloween House</h2></div>
         <button onclick="playClickSfx(); closeHouseModal()" class="text-zinc-400 hover:text-white p-1"><i data-lucide="x" class="w-4 h-4"></i></button>
       </div>
-
       <form id="houseForm" onsubmit="saveHouse(event)" class="p-4 sm:p-5 space-y-3.5 overflow-y-auto">
         <input type="hidden" id="formLat" />
         <input type="hidden" id="formLng" />
-
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="block text-[11px] font-medium text-zinc-400 mb-1">UAE Community / Area *</label>
@@ -366,12 +373,10 @@
             <input id="formTitle" type="text" required placeholder="e.g. Rahat 42 / Maple 118" class="w-full px-3 py-2 bg-zinc-900 border border-white/10 rounded-xl text-xs text-white placeholder-zinc-600 focus:border-orange-500 focus:outline-none" />
           </div>
         </div>
-
         <div id="customCommunityWrapper" class="hidden">
           <label class="block text-[11px] font-medium text-orange-400 mb-1">Enter Your Community & Emirate *</label>
-          <input id="formCustomCommunity" type="text" placeholder="e.g. Green Community, Dubai / Al Zahia, Sharjah" class="w-full px-3 py-2 bg-zinc-900 border border-orange-500/40 rounded-xl text-xs text-white placeholder-zinc-500 focus:border-orange-500 focus:outline-none" />
+          <input id="formCustomCommunity" type="text" placeholder="e.g. Green Community, Dubai" class="w-full px-3 py-2 bg-zinc-900 border border-orange-500/40 rounded-xl text-xs text-white placeholder-zinc-500 focus:border-orange-500 focus:outline-none" />
         </div>
-
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-[11px] font-medium text-zinc-400 mb-1">Marker Icon</label>
@@ -393,12 +398,10 @@
             </select>
           </div>
         </div>
-
         <div>
           <label class="block text-[11px] font-medium text-zinc-400 mb-1">Details / Active Hours *</label>
           <textarea id="formDesc" required rows="2" placeholder="e.g. Active 5:30–8:30 PM, ring bell for treats!" class="w-full px-3 py-2 bg-zinc-900 border border-white/10 rounded-xl text-xs text-white placeholder-zinc-600 focus:border-orange-500 focus:outline-none"></textarea>
         </div>
-
         <div>
           <label class="block text-[11px] font-medium text-zinc-400 mb-1">Tags</label>
           <div class="grid grid-cols-2 gap-2 text-xs">
@@ -408,7 +411,6 @@
             <label class="flex items-center gap-2 p-2 rounded-xl bg-zinc-900 border border-white/[0.07] cursor-pointer"><input type="checkbox" id="tagPhoto" class="accent-orange-500 rounded" /><span class="text-zinc-300">📸 Photo Op</span></label>
           </div>
         </div>
-
         <div class="space-y-1.5">
           <label class="block text-[11px] font-medium text-zinc-400">Photo (Optional)</label>
           <div class="flex items-center gap-3">
@@ -423,7 +425,6 @@
             </div>
           </div>
         </div>
-
         <div class="pt-3 border-t border-white/[0.08] flex items-center justify-end gap-2">
           <button type="button" onclick="playClickSfx(); closeHouseModal()" class="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-300 text-xs font-medium">Cancel</button>
           <button type="submit" id="submitVillaBtn" class="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-400 text-zinc-950 font-semibold text-xs">Publish Villa</button>
@@ -433,9 +434,7 @@
   </div>
 
   <script>
-    // ============================================================================
     // 1. FAMILY-FRIENDLY PROFANITY FILTER
-    // ============================================================================
     const BLOCKED_WORDS_REGEX = /\b(fuck|fucker|fucking|fck|fuk|shit|shitty|bullshit|bitch|bitches|asshole|bastard|dick|cock|pussy|cunt|whore|slut|nigger|nigga|faggot|fag|retard|retarded|porn|sex|nude|nudes|kill yourself|kys|penis|vagina|boobs|tits|wank|twat|prick|cum|jizz|dildo|rape|rapist|molest|pedophile|pedo|terrorist|bomb|isis|nazi|hitler)\b/i;
 
     function containsInappropriateContent(text) {
@@ -448,12 +447,33 @@
       return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
-    // ============================================================================
-    // 2. SILKY-SMOOTH HARDWARE-CLOCK HALLOWEEN MUSIC ENGINE
-    // ============================================================================
+    // 2. 4-TRACK SMOOTH HARDWARE-CLOCK HALLOWEEN MUSIC ENGINE
     let audioCtx = null, masterGain = null, musicBus = null, schedulerTimer = null;
     let isMuted = false, currentVolume = 0.35, splashDismissed = false;
-    let nextNoteTime = 0, currentStep = 0;
+    let nextNoteTime = 0, currentStep = 0, currentTrackIndex = 0;
+
+    const HALLOWEEN_TRACKS = [
+      {
+        name: 'Song 1',
+        lead: [659.25,0,587.33,0,523.25,0,493.88,0, 440.00,523.25,659.25,0,493.88,0,415.30,0, 659.25,0,783.99,0,698.46,0,659.25,0, 587.33,523.25,493.88,523.25,440.00,0,880.00,0],
+        bass: [220.00,0,329.63,0,261.63,0,329.63,0, 220.00,0,329.63,0,246.94,0,329.63,0, 220.00,0,329.63,0,293.66,0,349.23,0, 246.94,0,329.63,0,220.00,0,220.00,0]
+      },
+      {
+        name: 'Song 2',
+        lead: [587.33,0,698.46,587.33,554.37,0,587.33,0, 659.25,698.46,783.99,698.46,659.25,587.33,554.37,0, 587.33,0,880.00,0,783.99,698.46,659.25,0, 587.33,554.37,587.33,698.46,587.33,0,1174.66,0],
+        bass: [146.83,0,220.00,293.66,185.00,0,220.00,0, 196.00,0,293.66,0,220.00,0,185.00,0, 146.83,0,220.00,0,196.00,0,293.66,0, 220.00,0,185.00,0,146.83,0,293.66,0]
+      },
+      {
+        name: 'Song 3',
+        lead: [493.88,587.33,659.25,739.99,783.99,739.99,659.25,587.33, 523.25,659.25,783.99,0,739.99,659.25,587.33,0, 659.25,0,987.77,0,880.00,783.99,739.99,659.25, 587.33,659.25,739.99,587.33,659.25,0,659.25,0],
+        bass: [164.81,0,246.94,0,196.00,0,246.94,0, 130.81,0,196.00,0,185.00,0,246.94,0, 164.81,0,246.94,0,220.00,0,196.00,0, 185.00,0,246.94,0,164.81,0,329.63,0]
+      },
+      {
+        name: 'Song 4',
+        lead: [523.25,0,622.25,0,783.99,0,739.99,698.46, 622.25,0,523.25,0,493.88,523.25,587.33,0, 523.25,622.25,783.99,1046.5,932.33,783.99,698.46,622.25, 587.33,622.25,698.46,493.88,523.25,0,1046.5,0],
+        bass: [130.81,0,196.00,0,155.56,0,196.00,0, 174.61,0,261.63,0,146.83,0,196.00,0, 130.81,0,196.00,0,174.61,0,233.08,0, 196.00,0,146.83,0,130.81,0,261.63,0]
+      }
+    ];
 
     function initAudioEngine() {
       if (!audioCtx) {
@@ -484,41 +504,42 @@
 
     function scheduleSmoothTone(freq, startTime, duration, peakGain, waveType = 'sine') {
       if (!audioCtx || freq <= 0) return;
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
+      const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
       osc.type = waveType;
       osc.frequency.setValueAtTime(freq, startTime);
       gain.gain.setValueAtTime(0.0001, startTime);
       gain.gain.linearRampToValueAtTime(peakGain, startTime + 0.025);
       gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
-      osc.connect(gain);
-      gain.connect(musicBus);
-      osc.start(startTime);
-      osc.stop(startTime + duration + 0.02);
+      osc.connect(gain); gain.connect(musicBus);
+      osc.start(startTime); osc.stop(startTime + duration + 0.02);
     }
 
-    const CELESTA_MELODY = [
-      659.25, 0, 587.33, 0, 523.25, 0, 493.88, 0,
-      440.00, 523.25, 659.25, 0, 493.88, 0, 415.30, 0,
-      659.25, 0, 783.99, 0, 698.46, 0, 659.25, 0,
-      587.33, 523.25, 493.88, 523.25, 440.00, 0, 880.00, 0
-    ];
-    const WARM_BASS = [
-      220.00, 0, 329.63, 0, 261.63, 0, 329.63, 0,
-      220.00, 0, 329.63, 0, 246.94, 0, 329.63, 0,
-      220.00, 0, 329.63, 0, 293.66, 0, 349.23, 0,
-      246.94, 0, 329.63, 0, 220.00, 0, 220.00, 0
-    ];
-
     function scheduleMusicStep(stepIndex, time) {
+      // Auto-advance to the next track every 2 loops (64 steps) for continuous variety
+      if (stepIndex > 0 && stepIndex % 64 === 0) {
+        currentTrackIndex = (currentTrackIndex + 1) % HALLOWEEN_TRACKS.length;
+        const lbl = document.getElementById('trackNumLabel');
+        if (lbl) lbl.textContent = HALLOWEEN_TRACKS[currentTrackIndex].name;
+      }
+      const track = HALLOWEEN_TRACKS[currentTrackIndex];
       const step = stepIndex % 32;
-      const melFreq = CELESTA_MELODY[step];
+      const melFreq = track.lead[step];
       if (melFreq > 0) {
         scheduleSmoothTone(melFreq, time, 0.36, 0.14, 'sine');
         scheduleSmoothTone(melFreq * 2, time, 0.18, 0.03, 'sine');
       }
-      const bassFreq = WARM_BASS[step];
+      const bassFreq = track.bass[step];
       if (bassFreq > 0) scheduleSmoothTone(bassFreq, time, 0.42, 0.10, 'triangle');
+    }
+
+    function nextMusicTrack() {
+      initAudioEngine();
+      startBackgroundMusic();
+      currentTrackIndex = (currentTrackIndex + 1) % HALLOWEEN_TRACKS.length;
+      currentStep = 0;
+      const lbl = document.getElementById('trackNumLabel');
+      if (lbl) lbl.textContent = HALLOWEEN_TRACKS[currentTrackIndex].name;
+      playClickSfx();
     }
 
     function startBackgroundMusic() {
@@ -529,7 +550,7 @@
         if (!audioCtx || audioCtx.state !== 'running') return;
         while (nextNoteTime < audioCtx.currentTime + 0.15) {
           if (!isMuted) scheduleMusicStep(currentStep, nextNoteTime);
-          nextNoteTime += 0.22;
+          nextNoteTime += 0.21;
           currentStep++;
         }
       }, 40);
@@ -603,13 +624,59 @@
       lucide.createIcons();
     }
 
+    // 3. FIRST-TIME TUTORIAL + SPLASH DISMISSAL
+    const TUTORIAL_STEPS = [
+      { icon: '🎃', title: 'Explore UAE Halloween Houses', desc: 'Use the community selector at the top to jump to Mudon, DAMAC Hills, Arabian Ranches, Abu Dhabi, Sharjah, or anywhere in the UAE.' },
+      { icon: '🗺️', title: 'Build Your Trick-or-Treat Trail', desc: 'Tap "+ Trail" on any house to add it to your route! We draw a glowing trail line passing by each house and open the multi-stop walking route in Google Maps.' },
+      { icon: '💬', title: 'Rate Villas & Report Candy Status', desc: 'Tap "Reviews" on any house to leave a 1–5 star rating, post a comment, or let neighbors know if a house is Out of Candy.' },
+      { icon: '🏠', title: 'Hosting Trick-or-Treaters?', desc: 'Tap "+ Add" in the top right and tap your exact villa on the map to put your house on SpookyMap UAE!' }
+    ];
+    let tutStep = 0;
+
+    function openTutorial() {
+      tutStep = 0;
+      renderTutorialStep();
+      document.getElementById('tutorialModal').classList.remove('hidden');
+    }
+
+    function renderTutorialStep() {
+      const s = TUTORIAL_STEPS[tutStep];
+      document.getElementById('tutStepBadge').textContent = `Step ${tutStep + 1} of ${TUTORIAL_STEPS.length}`;
+      document.getElementById('tutIcon').textContent = s.icon;
+      document.getElementById('tutTitle').textContent = s.title;
+      document.getElementById('tutDesc').textContent = s.desc;
+      document.getElementById('tutNextBtn').textContent = tutStep === TUTORIAL_STEPS.length - 1 ? "Let's Go! 🎃" : 'Next →';
+      document.getElementById('tutDots').innerHTML = TUTORIAL_STEPS.map((_, i) =>
+        `<span class="h-1.5 rounded-full transition-all ${i === tutStep ? 'w-5 bg-orange-500' : 'w-1.5 bg-zinc-700'}"></span>`
+      ).join('');
+    }
+
+    function nextTutorialStep() {
+      playClickSfx();
+      if (tutStep < TUTORIAL_STEPS.length - 1) {
+        tutStep++;
+        renderTutorialStep();
+      } else {
+        finishTutorial();
+      }
+    }
+
+    function finishTutorial() {
+      playClickSfx();
+      localStorage.setItem('spookymap_tutorial_seen_v1', 'true');
+      document.getElementById('tutorialModal').classList.add('hidden');
+    }
+
     function dismissSplash(fromUserGesture) {
       if (splashDismissed) return;
       splashDismissed = true;
       if (fromUserGesture) { playBooSfx(); startBackgroundMusic(); }
       const splash = document.getElementById('introSplash');
       if (splash) splash.classList.add('hide-splash');
-      setTimeout(() => map.invalidateSize(), 200);
+      setTimeout(() => {
+        map.invalidateSize();
+        if (!localStorage.getItem('spookymap_tutorial_seen_v1')) openTutorial();
+      }, 300);
     }
 
     function replayIntro() {
@@ -626,9 +693,7 @@
       window.removeEventListener('pointerdown', unlockOnFirstTap);
     }, { once: true });
 
-    // ============================================================================
-    // 3. ADMIN WEBSITE LIVE FX RECEIVER (CANDY RAIN, PUMPKIN & BROADCASTS)
-    // ============================================================================
+    // 4. CREATOR BROADCAST & FX RECEIVER
     function runCandyRainFX() {
       playCandySparkleSfx();
       const layer = document.getElementById('fxLayer');
@@ -716,9 +781,7 @@
       }
     }
 
-    // ============================================================================
-    // 4. SUPABASE CONFIG & UAE-WIDE COMMUNITIES
-    // ============================================================================
+    // 5. SUPABASE CONFIG & UAE COMMUNITIES
     const SUPABASE_REST_URL = 'https://ojuljfzhbgycemzwapca.supabase.co/rest/v1';
     const SUPABASE_PROJECT_URL = 'https://ojuljfzhbgycemzwapca.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qdWxqZnpoYmd5Y2VtendhcGNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMDczOTgsImV4cCI6MjEwODc4MzM5OH0._reYqLhUCdidf0WKUXe2Dco6tAMCBLwhZhEs1F6Z6lM';
@@ -781,18 +844,16 @@
       ).join('') + `<optgroup label="Other UAE Area"><option value="__custom__">✨ Other Community (Type Below)...</option></optgroup>`;
     }
 
-    // ============================================================================
-    // 5. MAP, DATA PARSING (TAGS + REVIEWS) & REALTIME SYNC
-    // ============================================================================
+    // 6. MAP, TRAIL ROUTE BUILDER & REALTIME SYNC
     let housesMap = {}, currentFilter = 'all', isAddingHouse = false, uploadedBase64Image = '';
-    let markersLayer = L.layerGroup(), userLocationMarker = null, userAccuracyCircle = null, dbTableMissing = false;
+    let markersLayer = L.layerGroup(), trailLayer = L.layerGroup(), userLocationMarker = null, userAccuracyCircle = null;
     let activeReviewHouseId = null, currentSelectedStars = 5;
+    let trailIds = JSON.parse(localStorage.getItem('spookymap_trail_ids') || '[]');
 
     const CARTO_VOYAGER_URL = 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=cb1_4x1b_1_ab4b1fa2f97ec58b284fa30c';
     const map = L.map('map', {
       center: COORDS.both.center, zoom: COORDS.both.zoom, zoomControl: false, attributionControl: false,
-      preferCanvas: true, zoomSnap: 0.1, zoomDelta: 0.5, wheelPxPerZoomLevel: 100, inertia: true,
-      inertiaDeceleration: 2200, inertiaMaxSpeed: 2500, easeLinearity: 0.15
+      preferCanvas: true, zoomSnap: 0.1, zoomDelta: 0.5, wheelPxPerZoomLevel: 100, inertia: true
     });
 
     L.control.zoom({ position: 'topright' }).addTo(map);
@@ -801,36 +862,25 @@
     const plainSatelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], keepBuffer: 6 });
 
     darkVoyagerLayer.addTo(map);
+    trailLayer.addTo(map);
     markersLayer.addTo(map);
     window.addEventListener('resize', () => map.invalidateSize());
 
-    // Extracts string feature tags AND object reviews from the existing jsonb `tags` column
     function formatRow(row) {
       const rawTags = Array.isArray(row.tags) ? row.tags : [];
-      const featureTags = rawTags.filter(item => typeof item === 'string');
-      const reviews = rawTags.filter(item => item && typeof item === 'object' && item.type === 'review');
-
       return {
-        id: row.id,
-        community: row.community || 'UAE',
-        title: row.title,
-        lat: Number(row.lat),
-        lng: Number(row.lng),
-        icon: row.icon || '🎃',
-        status: row.status || 'plenty',
-        desc: row.description || '',
-        rawTags,
-        tags: featureTags,
-        reviews,
-        likes: Number(row.likes || 0),
-        image: row.image || '',
-        createdAt: Number(row.created_at || Date.now())
+        id: row.id, community: row.community || 'UAE', title: row.title,
+        lat: Number(row.lat), lng: Number(row.lng), icon: row.icon || '🎃',
+        status: row.status || 'plenty', desc: row.description || '',
+        rawTags, tags: rawTags.filter(i => typeof i === 'string'),
+        reviews: rawTags.filter(i => i && typeof i === 'object' && i.type === 'review'),
+        likes: Number(row.likes || 0), image: row.image || '', createdAt: Number(row.created_at || Date.now())
       };
     }
 
     function getHouseRatingSummary(house) {
       const revs = house.reviews || [];
-      if (revs.length === 0) return { avg: 0, count: 0, label: 'No ratings yet' };
+      if (revs.length === 0) return { avg: 0, count: 0, label: 'No ratings' };
       const sum = revs.reduce((acc, r) => acc + (Number(r.rating) || 5), 0);
       const avg = (sum / revs.length).toFixed(1);
       return { avg, count: revs.length, label: `⭐ ${avg} (${revs.length})` };
@@ -839,21 +889,15 @@
     async function fetchHousesFromSupabase() {
       try {
         const res = await fetch(`${SUPABASE_REST_URL}/houses?select=*&order=created_at.desc`, { method: 'GET', headers: SUPABASE_HEADERS });
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          if (res.status === 404 || errData.code === '42P01' || errData.code === 'PGRST205') { dbTableMissing = true; renderHouseList(); }
-          return;
-        }
+        if (!res.ok) return;
         const data = await res.json();
-        dbTableMissing = false;
         const nextMap = {};
         (data || []).forEach(row => { nextMap[row.id] = formatRow(row); });
         housesMap = nextMap;
+        trailIds = trailIds.filter(id => !!housesMap[id]);
         updateSidebarCommunityFilterOptions();
         renderUI();
-        if (activeReviewHouseId && housesMap[activeReviewHouseId]) {
-          renderReviewsModalContent(activeReviewHouseId);
-        }
+        if (activeReviewHouseId && housesMap[activeReviewHouseId]) renderReviewsModalContent(activeReviewHouseId);
       } catch (err) { console.warn('Sync error:', err); }
     }
 
@@ -865,13 +909,10 @@
           else if (payload.new) housesMap[payload.new.id] = formatRow(payload.new);
           updateSidebarCommunityFilterOptions();
           renderUI();
-          if (activeReviewHouseId && housesMap[activeReviewHouseId]) {
-            renderReviewsModalContent(activeReviewHouseId);
-          }
+          if (activeReviewHouseId && housesMap[activeReviewHouseId]) renderReviewsModalContent(activeReviewHouseId);
         })
         .subscribe();
 
-      // Listens to live events triggered from your separate Admin Website
       supabaseClient.channel('spookymap_live_fx')
         .on('broadcast', { event: 'admin_fx' }, ({ payload }) => executeIncomingAdminFX(payload))
         .subscribe();
@@ -890,16 +931,147 @@
       if ([...selectEl.options].some(o => o.value === currentVal)) selectEl.value = currentVal;
     }
 
-    // ============================================================================
-    // 6. RENDER MARKERS & SIDEBAR LIST (WITH RATINGS & COMMENTS BUTTON)
-    // ============================================================================
-    function renderUI() { renderMarkers(); renderHouseList(); lucide.createIcons(); }
+    // 7. TRICK-OR-TREAT TRAIL / ROUTE LOGIC
+    function saveTrailState() {
+      localStorage.setItem('spookymap_trail_ids', JSON.stringify(trailIds));
+    }
+
+    function toggleTrailStop(houseId) {
+      playClickSfx();
+      const idx = trailIds.indexOf(houseId);
+      if (idx >= 0) trailIds.splice(idx, 1);
+      else trailIds.push(houseId);
+      saveTrailState();
+      renderUI();
+    }
+
+    function clearTrail() {
+      playClickSfx();
+      trailIds = [];
+      saveTrailState();
+      renderUI();
+    }
+
+    function calcDistanceKm(lat1, lon1, lat2, lon2) {
+      const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function optimizeTrailOrder() {
+      playClickSfx();
+      const valid = trailIds.map(id => housesMap[id]).filter(Boolean);
+      if (valid.length < 3) return;
+      const ordered = [valid[0]];
+      const remaining = valid.slice(1);
+      while (remaining.length > 0) {
+        const last = ordered[ordered.length - 1];
+        let bestIdx = 0, bestDist = Infinity;
+        remaining.forEach((candidate, i) => {
+          const d = calcDistanceKm(last.lat, last.lng, candidate.lat, candidate.lng);
+          if (d < bestDist) { bestDist = d; bestIdx = i; }
+        });
+        ordered.push(remaining.splice(bestIdx, 1)[0]);
+      }
+      trailIds = ordered.map(h => h.id);
+      saveTrailState();
+      renderUI();
+    }
+
+    function openTrailInGoogleMaps() {
+      const stops = trailIds.map(id => housesMap[id]).filter(Boolean);
+      if (stops.length === 0) return alert('Add at least 1 house to your Trail first!');
+      if (stops.length === 1) {
+        window.open(`https://www.google.com/maps/dir/?api=1&destination=${stops[0].lat},${stops[0].lng}&travelmode=walking`, '_blank');
+        return;
+      }
+      const origin = `${stops[0].lat},${stops[0].lng}`;
+      const destination = `${stops[stops.length - 1].lat},${stops[stops.length - 1].lng}`;
+      const waypoints = stops.slice(1, -1).map(s => `${s.lat},${s.lng}`).join('|');
+      const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${waypoints ? '&waypoints=' + encodeURIComponent(waypoints) : ''}&travelmode=walking`;
+      window.open(url, '_blank');
+    }
+
+    function renderTrailMapAndPanel() {
+      trailLayer.clearLayers();
+      const stops = trailIds.map(id => housesMap[id]).filter(Boolean);
+      document.getElementById('headerTrailCount').textContent = stops.length;
+      document.getElementById('sidebarTrailCount').textContent = stops.length;
+
+      let totalKm = 0;
+      for (let i = 1; i < stops.length; i++) {
+        totalKm += calcDistanceKm(stops[i - 1].lat, stops[i - 1].lng, stops[i].lat, stops[i].lng);
+      }
+
+      if (stops.length >= 2) {
+        const latlngs = stops.map(s => [s.lat, s.lng]);
+        L.polyline(latlngs, { color: '#10b981', weight: 6, opacity: 0.25 }).addTo(trailLayer);
+        L.polyline(latlngs, { color: '#34d399', weight: 3, dashArray: '8, 10', className: 'trail-line-anim' }).addTo(trailLayer);
+      }
+
+      const distEl = document.getElementById('trailDistanceText');
+      if (distEl) {
+        distEl.textContent = stops.length === 0
+          ? 'Tap "+ Trail" on any house to build your route'
+          : `${stops.length} stops • Approx. ${totalKm.toFixed(2)} km trail`;
+      }
+
+      const listEl = document.getElementById('trailList');
+      if (!listEl) return;
+      if (stops.length === 0) {
+        listEl.innerHTML = `<div class="text-center py-12 px-4 space-y-2">
+          <div class="w-10 h-10 rounded-2xl bg-zinc-900 border border-white/[0.07] flex items-center justify-center mx-auto text-lg">🗺️</div>
+          <p class="text-xs font-semibold text-zinc-300">Your Trick-or-Treat Trail is empty</p>
+          <p class="text-[11px] text-zinc-500 max-w-[220px] mx-auto">Tap "+ Trail" on houses in the map or list to connect them into a walking route!</p>
+        </div>`;
+        return;
+      }
+
+      listEl.innerHTML = stops.map((h, idx) => `
+        <div onclick="focusHouse('${h.id}')" class="p-2.5 rounded-xl bg-zinc-900/80 border border-emerald-500/30 flex items-center justify-between gap-2.5 cursor-pointer hover:bg-zinc-900">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <span class="w-6 h-6 rounded-full bg-emerald-500 text-zinc-950 font-extrabold text-xs flex items-center justify-center shrink-0">${idx + 1}</span>
+            <div class="min-w-0">
+              <p class="text-[10px] font-semibold text-emerald-400 truncate">${escapeHtml(h.community)}</p>
+              <h4 class="text-xs font-bold text-white truncate">${escapeHtml(h.icon)} ${escapeHtml(h.title)}</h4>
+            </div>
+          </div>
+          <button onclick="event.stopPropagation(); toggleTrailStop('${h.id}')" class="px-2 py-1 rounded-lg bg-zinc-800 hover:bg-red-500/20 text-zinc-400 hover:text-red-300 text-[10px] font-semibold shrink-0">Remove</button>
+        </div>
+      `).join('');
+    }
+
+    function switchSidebarMode(mode) {
+      playClickSfx();
+      const isHouses = mode === 'houses';
+      document.getElementById('sidebarHousesPanel').classList.toggle('hidden', !isHouses);
+      document.getElementById('sidebarTrailPanel').classList.toggle('hidden', isHouses);
+      document.getElementById('sideTab-houses').className = isHouses
+        ? 'flex-1 py-1.5 rounded-lg text-xs font-semibold bg-zinc-800 text-white transition'
+        : 'flex-1 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition';
+      document.getElementById('sideTab-trail').className = !isHouses
+        ? 'flex-1 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 text-zinc-950 transition'
+        : 'flex-1 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition';
+    }
+
+    function openSidebarTab(mode) {
+      switchSidebarMode(mode);
+      if (window.innerWidth < 640) document.getElementById('sidebar').classList.remove('-translate-x-full');
+    }
+
+    // 8. RENDER MARKERS & SIDEBAR LIST
+    function renderUI() {
+      renderTrailMapAndPanel();
+      renderMarkers();
+      renderHouseList();
+      lucide.createIcons();
+    }
 
     function getStatusBadgeHtml(status) {
       return {
         plenty: `<span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">🍬 Plenty</span>`,
         low: `<span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">⚡ Low</span>`,
-        out: `<span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/20">💤 Out of Candy</span>`
+        out: `<span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/20">💤 Out</span>`
       }[status] || '';
     }
 
@@ -909,15 +1081,20 @@
       getHousesArray().forEach(house => {
         if (!passesFilter(house, query)) return;
         const isOut = house.status === 'out';
+        const trailStopIdx = trailIds.indexOf(house.id);
+        const inTrail = trailStopIdx >= 0;
+
         const icon = L.divIcon({
           className: '',
-          html: `<div class="custom-pin ${isOut ? 'pin-out-of-candy' : ''}"><span>${isOut ? '💤' : escapeHtml(house.icon)}</span></div>`,
+          html: `<div class="custom-pin ${isOut ? 'pin-out-of-candy' : ''} ${inTrail ? 'pin-in-trail' : ''}">
+            <span>${isOut ? '💤' : escapeHtml(house.icon)}</span>
+            ${inTrail ? `<div class="trail-badge">${trailStopIdx + 1}</div>` : ''}
+          </div>`,
           iconSize: [38, 38], iconAnchor: [19, 19], popupAnchor: [0, -20]
         });
 
         const statusBadge = getStatusBadgeHtml(house.status);
         const ratingInfo = getHouseRatingSummary(house);
-        const tags = house.tags || [];
         const safeComm = escapeHtml(house.community), safeTitle = escapeHtml(house.title), safeDesc = escapeHtml(house.desc);
 
         const popupHtml = `
@@ -933,18 +1110,13 @@
                 <span class="text-[10px] font-semibold text-amber-400 shrink-0">${ratingInfo.count > 0 ? ratingInfo.label : '⭐ New'}</span>
               </div>
               <p class="text-[11px] text-zinc-400 leading-relaxed">${safeDesc}</p>
-              ${tags.length > 0 ? `<div class="flex flex-wrap gap-1 pt-0.5">
-                ${tags.includes('allergy') ? '<span class="text-[10px] bg-zinc-800 px-2 py-0.5 rounded text-zinc-300">🥜 Allergy Safe</span>' : ''}
-                ${tags.includes('scary') ? '<span class="text-[10px] bg-zinc-800 px-2 py-0.5 rounded text-zinc-300">👻 Scary</span>' : ''}
-                ${tags.includes('toddler') ? '<span class="text-[10px] bg-zinc-800 px-2 py-0.5 rounded text-zinc-300">👶 Toddler Friendly</span>' : ''}
-                ${tags.includes('photo') ? '<span class="text-[10px] bg-zinc-800 px-2 py-0.5 rounded text-zinc-300">📸 Photo Op</span>' : ''}
-              </div>` : ''}
               <div class="pt-2 border-t border-white/[0.08] flex items-center justify-between gap-1">
-                <button onclick="playClickSfx(); upvoteHouse('${house.id}')" class="px-2 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[11px] font-medium">🎃 ${house.likes || 0}</button>
-                <button onclick="playClickSfx(); openReviewsModal('${house.id}')" class="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-amber-500/20 text-[11px] font-semibold">
-                  💬 Reviews (${ratingInfo.count})
+                <button onclick="upvoteHouse('${house.id}')" class="px-2 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[11px] font-medium">🎃 ${house.likes || 0}</button>
+                <button onclick="toggleTrailStop('${house.id}')" class="px-2 py-1.5 rounded-lg ${inTrail ? 'bg-emerald-500 text-zinc-950 font-bold' : 'bg-zinc-800 hover:bg-zinc-700 text-emerald-300'} text-[11px] transition">
+                  ${inTrail ? `✓ Stop #${trailStopIdx + 1}` : '+ Trail'}
                 </button>
-                <a href="https://www.google.com/maps/dir/?api=1&destination=${house.lat},${house.lng}" target="_blank" class="px-2.5 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 text-zinc-950 font-semibold text-[11px]">Go ↗</a>
+                <button onclick="openReviewsModal('${house.id}')" class="px-2 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-amber-300 text-[11px] font-semibold">💬 (${ratingInfo.count})</button>
+                <a href="https://www.google.com/maps/dir/?api=1&destination=${house.lat},${house.lng}" target="_blank" class="px-2 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 text-zinc-950 font-semibold text-[11px]">Go ↗</a>
               </div>
             </div>
           </div>`;
@@ -966,15 +1138,17 @@
         listEl.innerHTML = `<div class="text-center py-12 px-4 space-y-2">
           <div class="w-10 h-10 rounded-2xl bg-zinc-900 border border-white/[0.07] flex items-center justify-center mx-auto text-lg">🎃</div>
           <p class="text-xs font-medium text-zinc-300">No Halloween houses found</p>
-          <p class="text-[11px] text-zinc-500 max-w-[220px] mx-auto">Tap "+ Add House" and select your villa anywhere in the UAE.</p>
+          <p class="text-[11px] text-zinc-500 max-w-[220px] mx-auto">Tap "+ Add" and select your villa anywhere in the UAE.</p>
         </div>`;
         return;
       }
 
       listEl.innerHTML = filtered.map(house => {
         const ratingInfo = getHouseRatingSummary(house);
+        const trailStopIdx = trailIds.indexOf(house.id);
+        const inTrail = trailStopIdx >= 0;
         return `
-        <div onclick="playClickSfx(); focusHouse('${house.id}')" class="group bg-zinc-900/60 hover:bg-zinc-900 border border-white/[0.06] hover:border-white/15 rounded-xl p-2.5 transition cursor-pointer space-y-2">
+        <div onclick="playClickSfx(); focusHouse('${house.id}')" class="group bg-zinc-900/60 hover:bg-zinc-900 border ${inTrail ? 'border-emerald-500/40' : 'border-white/[0.06]'} rounded-xl p-2.5 transition cursor-pointer space-y-2">
           <div class="flex gap-3 items-start">
             ${house.image ? `<img src="${house.image}" class="w-12 h-12 rounded-lg object-cover shrink-0 border border-white/10" alt="${escapeHtml(house.title)}" />` : `<div class="w-12 h-12 rounded-lg bg-zinc-950 border border-white/[0.06] flex items-center justify-center text-xl shrink-0">${escapeHtml(house.icon)}</div>`}
             <div class="flex-1 min-w-0">
@@ -990,11 +1164,16 @@
             <div class="flex items-center gap-2 text-zinc-400">
               <span>🎃 ${house.likes || 0}</span>
               <span>•</span>
-              <span class="text-amber-400 font-semibold">${ratingInfo.count > 0 ? ratingInfo.label : '⭐ Rate Villa'}</span>
+              <span class="text-amber-400 font-semibold">${ratingInfo.count > 0 ? ratingInfo.label : '⭐ Rate'}</span>
             </div>
-            <button onclick="event.stopPropagation(); playClickSfx(); openReviewsModal('${house.id}')" class="px-2 py-0.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium transition">
-              💬 Comment / Candy Status
-            </button>
+            <div class="flex items-center gap-1">
+              <button onclick="event.stopPropagation(); toggleTrailStop('${house.id}')" class="px-2 py-0.5 rounded-md ${inTrail ? 'bg-emerald-500 text-zinc-950 font-bold' : 'bg-zinc-800 hover:bg-zinc-700 text-emerald-300'} font-medium transition">
+                ${inTrail ? `✓ Stop #${trailStopIdx + 1}` : '+ Trail'}
+              </button>
+              <button onclick="event.stopPropagation(); playClickSfx(); openReviewsModal('${house.id}')" class="px-2 py-0.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium transition">
+                💬 Reviews
+              </button>
+            </div>
           </div>
         </div>`;
       }).join('');
@@ -1012,9 +1191,7 @@
       return true;
     }
 
-    // ============================================================================
-    // 7. RATINGS, COMMENTS & "OUT OF CANDY" REPORTING LOGIC
-    // ============================================================================
+    // 9. RATINGS, COMMENTS & "OUT OF CANDY" REPORTING
     function openReviewsModal(houseId) {
       activeReviewHouseId = houseId;
       selectStarRating(5);
@@ -1031,8 +1208,7 @@
 
     function selectStarRating(stars) {
       currentSelectedStars = stars;
-      const buttons = document.querySelectorAll('#starSelector .star-btn');
-      buttons.forEach((btn, idx) => {
+      document.querySelectorAll('#starSelector .star-btn').forEach((btn, idx) => {
         btn.style.opacity = idx < stars ? '1' : '0.25';
       });
       document.getElementById('selectedStarText').textContent = `${stars} / 5 Stars`;
@@ -1041,16 +1217,13 @@
     function renderReviewsModalContent(houseId) {
       const house = housesMap[houseId];
       if (!house) return;
-
       document.getElementById('revModalComm').textContent = house.community;
       document.getElementById('revModalTitle').textContent = `${house.icon} ${house.title}`;
       document.getElementById('revCurrentStatusBadge').innerHTML = getStatusBadgeHtml(house.status);
 
       ['plenty', 'low', 'out'].forEach(st => {
         const btn = document.getElementById(`statusBtn-${st}`);
-        if (!btn) return;
-        const active = house.status === st;
-        btn.className = active
+        if (btn) btn.className = house.status === st
           ? 'py-2 px-2 rounded-xl bg-orange-500 text-zinc-950 font-bold text-[11px] shadow transition'
           : 'py-2 px-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 border border-white/10 text-zinc-300 font-semibold text-[11px] transition';
       });
@@ -1060,7 +1233,6 @@
 
       const listEl = document.getElementById('reviewsListContainer');
       const revs = [...(house.reviews || [])].sort((a, b) => (b.time || 0) - (a.time || 0));
-
       if (revs.length === 0) {
         listEl.innerHTML = `<div class="p-4 rounded-xl bg-zinc-900/40 border border-white/[0.05] text-center text-xs text-zinc-500">No comments yet. Let neighbors know how the decorations and candy are!</div>`;
         return;
@@ -1075,39 +1247,31 @@
           : r.candy === 'plenty'
           ? `<span class="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 text-[9px] font-semibold">Reported: 🍬 Plenty</span>`
           : '';
-
-        return `
-          <div class="p-3 rounded-xl bg-zinc-900/80 border border-white/[0.06] space-y-1">
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-xs font-bold text-white truncate">${escapeHtml(r.author || 'Trick-or-Treater')}</span>
-              <span class="text-[10px] shrink-0">${starsStr}</span>
-            </div>
-            ${candyNote ? `<div>${candyNote}</div>` : ''}
-            <p class="text-xs text-zinc-300 leading-relaxed break-words">${escapeHtml(r.text)}</p>
+        return `<div class="p-3 rounded-xl bg-zinc-900/80 border border-white/[0.06] space-y-1">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-bold text-white truncate">${escapeHtml(r.author || 'Trick-or-Treater')}</span>
+            <span class="text-[10px] shrink-0">${starsStr}</span>
           </div>
-        `;
+          ${candyNote ? `<div>${candyNote}</div>` : ''}
+          <p class="text-xs text-zinc-300 leading-relaxed break-words">${escapeHtml(r.text)}</p>
+        </div>`;
       }).join('');
     }
 
     async function reportCandyStatus(nextStatus) {
       if (!activeReviewHouseId || !housesMap[activeReviewHouseId]) return;
       playClickSfx();
-      const house = housesMap[activeReviewHouseId];
-      house.status = nextStatus;
+      housesMap[activeReviewHouseId].status = nextStatus;
       renderReviewsModalContent(activeReviewHouseId);
       renderUI();
-
       await fetch(`${SUPABASE_REST_URL}/houses?id=eq.${encodeURIComponent(activeReviewHouseId)}`, {
-        method: 'PATCH',
-        headers: SUPABASE_HEADERS,
-        body: JSON.stringify({ status: nextStatus })
+        method: 'PATCH', headers: SUPABASE_HEADERS, body: JSON.stringify({ status: nextStatus })
       });
     }
 
     async function submitHouseReview(e) {
       e.preventDefault();
       if (!activeReviewHouseId || !housesMap[activeReviewHouseId]) return;
-
       const author = document.getElementById('reviewAuthorInput').value.trim();
       const comment = document.getElementById('reviewCommentInput').value.trim();
       const candyReport = document.getElementById('reviewCandyReport').value;
@@ -1117,34 +1281,18 @@
       }
 
       const submitBtn = document.getElementById('submitReviewBtn');
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Posting...';
+      submitBtn.disabled = true; submitBtn.textContent = 'Posting...';
 
       const house = housesMap[activeReviewHouseId];
-      const newReview = {
-        type: 'review',
-        author: author || 'Trick-or-Treater',
-        rating: currentSelectedStars,
-        text: comment,
-        candy: candyReport || '',
-        time: Date.now()
-      };
-
+      const newReview = { type: 'review', author: author || 'Trick-or-Treater', rating: currentSelectedStars, text: comment, candy: candyReport || '', time: Date.now() };
       const nextRawTags = [...(house.rawTags || []), newReview];
       const nextStatus = candyReport || house.status;
 
-      const patchPayload = { tags: nextRawTags, status: nextStatus };
-
       try {
         const res = await fetch(`${SUPABASE_REST_URL}/houses?id=eq.${encodeURIComponent(activeReviewHouseId)}`, {
-          method: 'PATCH',
-          headers: SUPABASE_HEADERS,
-          body: JSON.stringify(patchPayload)
+          method: 'PATCH', headers: SUPABASE_HEADERS, body: JSON.stringify({ tags: nextRawTags, status: nextStatus })
         });
-
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Post Rating & Comment';
-
+        submitBtn.disabled = false; submitBtn.textContent = 'Post Rating & Comment';
         if (res.ok) {
           playSuccessSfx();
           house.rawTags = nextRawTags;
@@ -1155,15 +1303,12 @@
           renderReviewsModalContent(activeReviewHouseId);
           renderUI();
         }
-      } catch (err) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Post Rating & Comment';
+      } catch (_) {
+        submitBtn.disabled = false; submitBtn.textContent = 'Post Rating & Comment';
       }
     }
 
-    // ============================================================================
-    // 8. ADD HOUSE, PROFANITY CHECK & MAP CONTROLS
-    // ============================================================================
+    // 10. ADD HOUSE & MAP CONTROLS
     function startAddHouseMode() {
       isAddingHouse = true;
       document.getElementById('placementBanner').classList.remove('hidden');
@@ -1178,17 +1323,9 @@
     }
 
     function toggleCustomCommunityInput() {
-      const selectEl = document.getElementById('formCommunity');
-      const wrapper = document.getElementById('customCommunityWrapper');
-      const customInput = document.getElementById('formCustomCommunity');
-      if (selectEl.value === '__custom__') {
-        wrapper.classList.remove('hidden');
-        customInput.required = true;
-        setTimeout(() => customInput.focus(), 50);
-      } else {
-        wrapper.classList.add('hidden');
-        customInput.required = false;
-      }
+      const isCustom = document.getElementById('formCommunity').value === '__custom__';
+      document.getElementById('customCommunityWrapper').classList.toggle('hidden', !isCustom);
+      document.getElementById('formCustomCommunity').required = isCustom;
     }
 
     function detectClosestUAECommunity(lat, lng) {
@@ -1225,8 +1362,7 @@
         img.onload = function() {
           const canvas = document.createElement('canvas');
           const scale = Math.min(1, 460 / img.width);
-          canvas.width = img.width * scale;
-          canvas.height = img.height * scale;
+          canvas.width = img.width * scale; canvas.height = img.height * scale;
           canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
           uploadedBase64Image = canvas.toDataURL('image/jpeg', 0.65);
           document.getElementById('imagePreview').src = uploadedBase64Image;
@@ -1247,7 +1383,6 @@
       document.getElementById('houseModal').classList.add('hidden');
       document.getElementById('houseForm').reset();
       document.getElementById('customCommunityWrapper').classList.add('hidden');
-      document.getElementById('formCustomCommunity').required = false;
       clearUploadedImage();
     }
 
@@ -1259,13 +1394,11 @@
       const descText = document.getElementById('formDesc').value.trim();
 
       if (containsInappropriateContent(finalCommunity) || containsInappropriateContent(titleText) || containsInappropriateContent(descText)) {
-        alert('⚠️ Family-Friendly Filter: Please remove any inappropriate language before publishing your villa.');
-        return;
+        return alert('⚠️ Family-Friendly Filter: Please remove any inappropriate language before publishing your villa.');
       }
 
       const submitBtn = document.getElementById('submitVillaBtn');
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Publishing...';
+      submitBtn.disabled = true; submitBtn.textContent = 'Publishing...';
 
       const tags = [];
       if (document.getElementById('tagAllergy').checked) tags.push('allergy');
@@ -1286,29 +1419,24 @@
 
       try {
         const res = await fetch(`${SUPABASE_REST_URL}/houses`, { method: 'POST', headers: SUPABASE_HEADERS, body: JSON.stringify(rowData) });
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Publish Villa';
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          alert('Supabase error: ' + (err.message || res.statusText));
-          return;
+        submitBtn.disabled = false; submitBtn.textContent = 'Publish Villa';
+        if (res.ok) {
+          playSuccessSfx();
+          housesMap[rowData.id] = formatRow(rowData);
+          updateSidebarCommunityFilterOptions();
+          closeHouseModal();
+          renderUI();
+          map.flyTo([rowData.lat, rowData.lng], 17, { animate: true, duration: 1.15 });
         }
-        playSuccessSfx();
-        housesMap[rowData.id] = formatRow(rowData);
-        updateSidebarCommunityFilterOptions();
-        closeHouseModal();
-        renderUI();
-        map.flyTo([rowData.lat, rowData.lng], 17, { animate: true, duration: 1.15, easeLinearity: 0.15 });
       } catch (err) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Publish Villa';
-        alert('Network error saving house: ' + err.message);
+        submitBtn.disabled = false; submitBtn.textContent = 'Publish Villa';
       }
     }
 
     async function upvoteHouse(id) {
       const h = housesMap[id];
       if (!h) return;
+      playClickSfx();
       h.likes = (h.likes || 0) + 1;
       renderUI();
       await fetch(`${SUPABASE_REST_URL}/houses?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', headers: SUPABASE_HEADERS, body: JSON.stringify({ likes: h.likes }) });
@@ -1316,23 +1444,19 @@
 
     function flyToArea(area) {
       const target = COORDS[area] || COORDS.uae;
-      map.flyTo(target.center, target.zoom, { animate: true, duration: 1.25, easeLinearity: 0.15 });
+      map.flyTo(target.center, target.zoom, { animate: true, duration: 1.25 });
       document.querySelectorAll('.area-tab').forEach(btn => {
         btn.className = 'area-tab px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 transition';
       });
       const activeBtn = document.getElementById(`tab-${area}`);
       if (activeBtn) activeBtn.className = 'area-tab px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 text-white shadow-sm transition';
-      const desktopSelect = document.getElementById('desktopAreaSelect');
-      if (desktopSelect && [...desktopSelect.options].some(o => o.value === area)) desktopSelect.value = area;
-      const mobileSelect = document.getElementById('mobileAreaSelect');
-      if (mobileSelect && [...mobileSelect.options].some(o => o.value === area)) mobileSelect.value = area;
     }
 
     function focusHouse(id) {
       const h = housesMap[id];
       if (!h) return;
       if (window.innerWidth < 640) toggleMobileDrawer();
-      map.flyTo([h.lat, h.lng], 17.2, { animate: true, duration: 1.1, easeLinearity: 0.15 });
+      map.flyTo([h.lat, h.lng], 17.2, { animate: true, duration: 1.1 });
     }
 
     function setFilter(filter) {
@@ -1345,9 +1469,7 @@
     }
 
     function setMapLayer(type) {
-      map.removeLayer(darkVoyagerLayer);
-      map.removeLayer(lightVoyagerLayer);
-      map.removeLayer(plainSatelliteLayer);
+      map.removeLayer(darkVoyagerLayer); map.removeLayer(lightVoyagerLayer); map.removeLayer(plainSatelliteLayer);
       ['dark', 'voyager', 'satellite'].forEach(id => {
         document.getElementById(`layer-${id}`).className = 'px-2.5 py-1.5 rounded-lg text-zinc-400 hover:text-white font-medium transition';
       });
@@ -1368,18 +1490,10 @@
         const { latitude, longitude, accuracy } = pos.coords;
         if (userLocationMarker) map.removeLayer(userLocationMarker);
         if (userAccuracyCircle) map.removeLayer(userAccuracyCircle);
-
-        userAccuracyCircle = L.circle([latitude, longitude], {
-          radius: Math.min(accuracy || 30, 120), color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.12, weight: 1
-        }).addTo(map);
-
+        userAccuracyCircle = L.circle([latitude, longitude], { radius: Math.min(accuracy || 30, 120), color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.12, weight: 1 }).addTo(map);
         const gpsIcon = L.divIcon({ className: '', html: `<div class="user-gps-dot"></div>`, iconSize: [18, 18], iconAnchor: [9, 9] });
-        userLocationMarker = L.marker([latitude, longitude], { icon: gpsIcon })
-          .addTo(map)
-          .bindPopup('<div class="p-2 text-xs font-semibold text-center">📍 You are here</div>')
-          .openPopup();
-
-        map.flyTo([latitude, longitude], 16.8, { animate: true, duration: 1.2, easeLinearity: 0.15 });
+        userLocationMarker = L.marker([latitude, longitude], { icon: gpsIcon }).addTo(map).bindPopup('<div class="p-2 text-xs font-semibold text-center">📍 You are here</div>').openPopup();
+        map.flyTo([latitude, longitude], 16.8, { animate: true, duration: 1.2 });
       };
 
       const onError = err => {
