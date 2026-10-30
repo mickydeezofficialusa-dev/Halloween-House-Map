@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>SpookyMap UAE | Halloween Trick-or-Treat Tracker</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎃</text></svg>" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { font-family: 'Inter', -apple-system, sans-serif; background: #09090b; color: #f4f4f5; margin: 0; padding: 0; width: 100%; height: 100%; height: 100dvh; overflow: hidden; position: fixed; inset: 0; -webkit-font-smoothing: antialiased; }
+    .safe-top { padding-top: env(safe-area-inset-top, 0px); }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+    .map-controls-bottom { bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); }
+    #introSplash { transition: opacity 0.7s ease, transform 0.7s ease; }
+    #introSplash.hide-splash { opacity: 0; transform: scale(1.06); pointer-events: none; }
+    @keyframes ghostFloat { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-14px) rotate(4deg); } }
+    @keyframes booPop { 0% { opacity: 0; transform: scale(0.4) translateY(20px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+    @keyframes candyFall { 0% { transform: translateY(-12vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(112vh) translateX(var(--drift, 40px)) rotate(var(--spin, 540deg)); opacity: 0; } }
+    @keyframes ghostSweep { 0% { transform: translateX(-15vw); opacity: 0; } 20%, 80% { opacity: 0.95; } 100% { transform: translateX(115vw) translateY(-20px); opacity: 0; } }
+    @keyframes welcomePop { 0% { opacity: 0; transform: scale(0.3); } 100% { opacity: 1; transform: scale(1); } }
+    @keyframes dashFlow { to { stroke-dashoffset: -36; } }
+    .trail-line-anim { animation: dashFlow 1s linear infinite; }
+    .candy-drop { position: fixed; top: -60px; pointer-events: none; z-index: 9500; animation: candyFall var(--dur, 3.5s) linear forwards; }
+    .ghost-flyer { position: fixed; left: -80px; pointer-events: none; z-index: 9500; animation: ghostSweep var(--dur, 4.2s) ease-in-out forwards; }
+    .animate-welcome-pop { animation: welcomePop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+    .animate-ghost { animation: ghostFloat 2.6s ease-in-out infinite; }
+    .animate-boo { animation: booPop 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both; }
+    input[type="range"].volume-slider { -webkit-appearance: none; appearance: none; width: 52px; height: 4px; background: #27272a; border-radius: 999px; outline: none; cursor: pointer; }
+    input[type="range"].volume-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #f97316; border: 2px solid #fff; }
+    .leaflet-container { background: #09090b !important; width: 100%; height: 100%; }
+    .carto-voyager-dark { filter: invert(100%) hue-rotate(180deg) brightness(94%) contrast(92%) saturate(80%); }
+    .custom-pin { position: relative; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; background: #18181b; border: 2px solid #f97316; border-radius: 13px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.85), 0 0 0 4px rgba(249,115,22,0.22); transition: transform 0.2s ease; }
+    .custom-pin:hover { transform: scale(1.15) translateY(-3px); z-index: 999 !important; }
+    .custom-pin span { font-size: 19px; line-height: 1; }
+    .pin-out-of-candy { background: #09090b; border-color: #3f3f46; opacity: 0.6; }
+    .pin-visited { border-color: #a855f7 !important; box-shadow: 0 0 0 4px rgba(168,85,247,0.3) !important; }
+    .pin-in-trail { border-color: #10b981 !important; box-shadow: 0 0 0 5px rgba(16,185,129,0.35) !important; }
+    .trail-badge { position: absolute; top: -7px; right: -7px; width: 18px; height: 18px; border-radius: 999px; background: #10b981; color: #052e16; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid #09090b; }
+    .visited-badge { position: absolute; bottom: -6px; left: -6px; width: 17px; height: 17px; border-radius: 999px; background: #a855f7; color: #fff; font-size: 9px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid #09090b; }
+    .user-gps-dot { width: 18px; height: 18px; background: #3b82f6; border: 3px solid #fff; border-radius: 9999px; box-shadow: 0 0 0 6px rgba(59,130,246,0.35); }
+    .leaflet-popup-content-wrapper { background: #121215 !important; color: #f4f4f5 !important; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px !important; padding: 0 !important; overflow: hidden; }
+    .leaflet-popup-content { margin: 0 !important; width: 285px !important; }
+    .leaflet-popup-tip { background: #121215 !important; }
+    .leaflet-container a.leaflet-popup-close-button { color: #a1a1aa !important; background: rgba(9,9,11,0.75) !important; border-radius: 9999px; width: 26px !important; height: 26px !important; top: 8px !important; right: 8px !important; display: flex; align-items: center; justify-content: center; z-index: 10; }
+    .leaflet-bar { border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 12px !important; overflow: hidden; }
+    .leaflet-bar a { background-color: #121215 !important; color: #e4e4e7 !important; border-bottom: 1px solid rgba(255,255,255,0.08) !important; }
+    .smooth-drawer { transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 9999px; }
+  </style>
+</head>
+<body class="flex flex-col select-none bg-[#09090b] text-zinc-100">
+
+  <div id="fxLayer" class="fixed inset-0 pointer-events-none z-[9500] overflow-hidden"></div>
+
+  <!-- MESSAGE FROM THE CREATOR POPUP -->
+  <div id="welcomePumpkinOverlay" onclick="hideWelcomePumpkin()" class="hidden fixed inset-0 z-[9600] bg-black/75 backdrop-blur-md flex items-center justify-center p-5 cursor-pointer">
+    <div class="animate-welcome-pop relative max-w-sm w-full bg-zinc-900 border-2 border-orange-500/60 rounded-3xl p-6 text-center shadow-2xl">
+      <div class="w-24 h-24 mx-auto rounded-3xl bg-orange-500/15 border border-orange-500/40 flex items-center justify-center text-6xl mb-4 animate-ghost">🎃</div>
+      <span class="inline-block px-3 py-1 rounded-full bg-orange-500/20 border border-orange-500/40 text-orange-300 text-[10px] font-bold uppercase tracking-widest mb-2">SpookyMap UAE Official</span>
+      <h2 class="text-2xl sm:text-3xl font-extrabold text-orange-400">Message from the Creator 🎃</h2>
+      <p id="welcomePumpkinSub" class="text-xs sm:text-sm text-zinc-300 mt-2 leading-relaxed">Happy Trick-or-Treating across the UAE! Stay safe & enjoy the candy! 🍬✨</p>
+      <p class="text-[10px] text-zinc-500 mt-4">Tap anywhere to dismiss</p>
+    </div>
+  </div>
+
+  <!-- LIVE BROADCAST BANNER -->
+  <div id="liveBroadcastBanner" class="hidden fixed top-16 left-1/2 -translate-x-1/2 z-[9400] w-[92%] max-w-lg bg-gradient-to-r from-orange-500 via-amber-500 to-orange-500 p-0.5 rounded-2xl shadow-2xl">
+    <div class="bg-[#121215]/95 rounded-[14px] px-3.5 py-2.5 flex items-center justify-between gap-2.5">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <span class="w-8 h-8 rounded-xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center text-base shrink-0 animate-bounce">🎃</span>
+        <div class="min-w-0">
+          <p class="text-[9px] font-bold uppercase tracking-wider text-orange-400">Message from the Creator</p>
+          <p id="liveBroadcastText" class="text-xs font-semibold text-white break-words"></p>
+        </div>
+      </div>
+      <button onclick="dismissBroadcastBanner()" class="text-zinc-400 hover:text-white p-1 shrink-0"><i data-lucide="x" class="w-4 h-4"></i></button>
+    </div>
+  </div>
+
+  <!-- FIRST-TIME TUTORIAL MODAL -->
+  <div id="tutorialModal" class="hidden fixed inset-0 z-[9800] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 safe-top safe-bottom">
+    <div class="bg-[#121215] border border-orange-500/30 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 text-center">
+      <div class="flex items-center justify-between">
+        <span id="tutStepBadge" class="px-2.5 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/30 text-orange-400 text-[10px] font-bold uppercase">Step 1 of 5</span>
+        <button onclick="finishTutorial()" class="text-xs font-semibold text-zinc-400 hover:text-white px-2.5 py-1 rounded-lg bg-zinc-900 border border-white/10">Skip ✕</button>
+      </div>
+      <div id="tutIcon" class="w-20 h-20 mx-auto rounded-3xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-5xl">🎃</div>
+      <div class="space-y-1.5">
+        <h3 id="tutTitle" class="text-base font-extrabold text-white"></h3>
+        <p id="tutDesc" class="text-xs text-zinc-400 leading-relaxed"></p>
+      </div>
+      <div class="flex items-center justify-center gap-1.5" id="tutDots"></div>
+      <div class="flex gap-2 pt-1">
+        <button onclick="finishTutorial()" class="flex-1 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold text-xs">Skip Tutorial</button>
+        <button onclick="nextTutorialStep()" id="tutNextBtn" class="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-400 text-zinc-950 font-bold text-xs">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SPLASH SCREEN -->
+  <div id="introSplash" onclick="dismissSplash(true)" class="fixed inset-0 z-[9999] bg-[#09090b] flex flex-col items-center justify-center p-5 overflow-hidden cursor-pointer safe-top safe-bottom">
+    <div class="absolute w-72 h-72 rounded-full bg-orange-500/15 blur-[90px] pointer-events-none"></div>
+    <div class="relative flex flex-col items-center text-center max-w-sm z-10">
+      <div class="animate-ghost w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-zinc-900/90 border border-orange-500/30 flex items-center justify-center text-5xl sm:text-6xl mb-3">👻</div>
+      <div class="animate-boo">
+        <span class="inline-block px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[10px] font-semibold tracking-widest uppercase mb-1.5">Welcome to SpookyMap UAE</span>
+        <h1 class="text-4xl sm:text-6xl font-extrabold tracking-tight bg-gradient-to-br from-white via-orange-200 to-orange-500 bg-clip-text text-transparent">BOO! 🎃</h1>
+        <p class="text-xs text-zinc-400 mt-1.5">UAE-Wide Halloween Trick-or-Treat Tracker</p>
+      </div>
+      <div class="mt-6 pt-5 border-t border-white/[0.08] w-full">
+        <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500 mb-2.5">Created By</p>
+        <div class="flex flex-wrap items-center justify-center gap-2">
+          <span class="px-3 py-1.5 rounded-xl bg-zinc-900/90 border border-white/10 text-xs font-semibold text-zinc-100">🎃 Amaan Hakim</span>
+          <span class="px-3 py-1.5 rounded-xl bg-zinc-900/90 border border-orange-500/25 text-xs font-semibold text-orange-300">✨ Gemini Argon</span>
+        </div>
+      </div>
+      <div class="mt-6">
+        <button onclick="dismissSplash(true)" class="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-400 text-zinc-950 font-bold text-xs flex items-center gap-2">
+          <span>Enter UAE Map & Start Music</span>
+          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP NAVIGATION -->
+  <header class="safe-top bg-[#09090b]/95 backdrop-blur-xl border-b border-white/[0.08] z-30 shrink-0">
+    <div class="h-14 px-2.5 sm:px-5 flex items-center justify-between gap-1.5">
+      <div class="flex items-center gap-2 min-w-0">
+        <div class="w-8 h-8 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-base shrink-0">🎃</div>
+        <div class="truncate">
+          <div class="flex items-center gap-1">
+            <h1 class="text-xs sm:text-base font-bold text-white truncate">SpookyMap</h1>
+            <span class="px-1.5 py-0.5 rounded bg-orange-500/15 border border-orange-500/30 text-[9px] font-bold text-orange-400">UAE</span>
+          </div>
+          <p class="text-[10px] text-zinc-400 hidden sm:block">All UAE Communities & Emirates</p>
+        </div>
+      </div>
+
+      <div class="hidden md:flex items-center bg-zinc-900/90 p-1 rounded-xl border border-white/[0.07] gap-1">
+        <button onclick="playClickSfx(); flyToArea('uae')" id="tab-uae" class="area-tab px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-400">🇦🇪 All UAE</button>
+        <button onclick="playClickSfx(); flyToArea('both')" id="tab-both" class="area-tab px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 text-white">Mudon & DH1</button>
+        <button onclick="playClickSfx(); flyToArea('mudon')" id="tab-mudon" class="area-tab px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-400">Mudon</button>
+        <button onclick="playClickSfx(); flyToArea('dh1')" id="tab-dh1" class="area-tab px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-400">DAMAC Hills 1</button>
+        <select id="desktopAreaSelect" onchange="playClickSfx(); flyToArea(this.value)" class="px-2.5 py-1.5 rounded-lg bg-zinc-950 text-xs font-medium text-zinc-200 border border-white/[0.08]"></select>
+      </div>
+
+      <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
+        <div class="flex items-center gap-1.5 px-2 py-1.5 rounded-xl bg-zinc-900 border border-white/[0.08]">
+          <button onclick="toggleMute()" id="muteBtn" class="text-zinc-300 hover:text-orange-400 flex items-center"><i id="volumeIcon" data-lucide="volume-2" class="w-3.5 h-3.5 text-orange-400"></i></button>
+          <input id="volumeSlider" type="range" min="0" max="100" value="35" oninput="handleVolumeChange(this.value)" class="volume-slider hidden sm:block" />
+          <button onclick="nextMusicTrack()" id="trackBtn" class="text-[10px] font-semibold text-zinc-300 hover:text-orange-400 pl-1 border-l border-white/10 flex items-center gap-1">
+            <span>🎵</span><span id="trackNumLabel" class="hidden xl:inline">Song 1</span>
+          </button>
+        </div>
+        <button onclick="playClickSfx(); openSidebarTab('trail')" class="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 text-xs font-semibold">
+          <span>🗺️</span><span class="hidden sm:inline">Trail</span><span>(<span id="headerTrailCount">0</span>)</span>
+        </button>
+        <button onclick="playClickSfx(); locateUser()" id="nearMeBtn" class="px-2.5 py-1.5 rounded-xl bg-zinc-900 text-zinc-300 border border-white/[0.08] flex items-center gap-1 text-xs font-medium">
+          <i data-lucide="navigation" class="w-3.5 h-3.5 text-orange-400"></i><span id="nearMeText" class="hidden lg:inline">Near Me</span>
+        </button>
+        <button onclick="playClickSfx(); startAddHouseMode()" class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-400 text-zinc-950 font-semibold text-xs flex items-center gap-1">
+          <i data-lucide="plus" class="w-3.5 h-3.5 stroke-[2.5]"></i><span>Add</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MOBILE BAR -->
+  <div class="md:hidden bg-[#0c0c0f] border-b border-white/[0.07] px-2.5 py-1.5 flex items-center justify-between gap-1.5 z-20 shrink-0">
+    <select id="mobileAreaSelect" onchange="playClickSfx(); flyToArea(this.value)" class="flex-1 min-w-0 px-2.5 py-1.5 rounded-xl bg-zinc-900 text-[11px] font-medium text-white border border-white/[0.08] truncate"></select>
+    <div class="flex items-center bg-zinc-900 px-2 py-1.5 rounded-xl border border-white/[0.08] sm:hidden shrink-0">
+      <input id="mobileVolumeSlider" type="range" min="0" max="100" value="35" oninput="handleVolumeChange(this.value)" class="volume-slider !w-12" />
+    </div>
+    <button onclick="playClickSfx(); toggleMobileDrawer()" class="px-2.5 py-1.5 rounded-xl bg-zinc-900 border border-white/[0.08] text-[11px] font-medium text-zinc-200 flex items-center gap-1 shrink-0">
+      <i data-lucide="list" class="w-3.5 h-3.5 text-orange-400"></i><span>Houses (<span id="mobileCount">0</span>)</span>
+    </button>
+  </div>
+
+  <!-- MAIN WORKSPACE -->
+  <div class="flex-1 flex relative overflow-hidden min-h-0">
+    <aside id="sidebar" class="smooth-drawer w-full sm:w-80 lg:w-96 bg-[#0c0c0f] border-r border-white/[0.08] flex flex-col z-20 absolute sm:relative inset-0 transform -translate-x-full sm:translate-x-0 safe-bottom">
+      <div class="p-3 border-b border-white/[0.07] flex items-center justify-between gap-1.5 bg-[#09090b] shrink-0">
+        <div class="flex gap-1 flex-1 bg-zinc-900 p-1 rounded-xl border border-white/[0.06]">
+          <button onclick="switchSidebarMode('houses')" id="sideTab-houses" class="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-zinc-800 text-white">🏠 Houses (<span id="houseCount">0</span>)</button>
+          <button onclick="switchSidebarMode('trail')" id="sideTab-trail" class="flex-1 py-1.5 rounded-lg text-xs font-semibold text-zinc-400">🗺️ My Trail (<span id="sidebarTrailCount">0</span>)</button>
+        </div>
+        <button onclick="playClickSfx(); toggleMobileDrawer()" class="sm:hidden text-zinc-400 hover:text-white p-1.5"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <!-- HOUSES PANEL -->
+      <div id="sidebarHousesPanel" class="flex-1 flex flex-col min-h-0">
+        <div class="p-3 border-b border-white/[0.07] space-y-2 shrink-0">
+          <input id="searchInput" oninput="renderUI()" type="text" placeholder="Search community, cluster, villa #..." class="w-full px-3 py-2 bg-zinc-900 border border-white/[0.08] rounded-xl text-xs text-white placeholder-zinc-500" />
+          <select id="communityFilterSelect" onchange="playClickSfx(); renderUI()" class="w-full px-3 py-1.5 bg-zinc-900 border border-white/[0.08] rounded-xl text-xs text-zinc-300">
+            <option value="all">🌍 Showing All UAE Communities</option>
+          </select>
+          <div class="flex items-center gap-1.5 overflow-x-auto pb-0.5 text-[11px]">
+            <button onclick="playClickSfx(); setFilter('all')" id="filter-all" class="filter-pill px-2.5 py-1 rounded-lg bg-zinc-800 text-white border border-white/10 font-medium shrink-0">All</button>
+            <button onclick="playClickSfx(); setFilter('candy')" id="filter-candy" class="filter-pill px-2.5 py-1 rounded-lg bg-zinc-900 text-zinc-400 border border-white/[0.05] shrink-0">🍬 Has Candy</button>
+            <button onclick="playClickSfx(); setFilter('visited')" id="filter-visited" class="filter-pill px-2.5 py-1 rounded-lg bg-zinc-900 text-zinc-400 border border-white/[0.05] shrink-0">✅ Visited (<span id="visitedCountBadge">0</span>)</button>
+            <button onclick="playClickSfx(); setFilter('mine')" id="filter-mine" class="filter-pill px-2.5 py-1 rounded-lg bg-zinc-900 text-zinc-400 border border-white/[0.05] shrink-0">🔑 My Villas</button>
+            <button onclick="playClickSfx(); setFilter('allergy')" id="filter-allergy" class="filter-pill px-2.5 py-1 rounded-lg bg-zinc-900 text-zinc-400 border border-white/[0.05] shrink-0">🥜 Allergy Safe</button>
+          </div>
+        </div>
+        <div id="houseList" class="flex-1 overflow-y-auto p-3 space-y-2 min-h-0"></div>
+      </div>
+
+      <!-- TRAIL PANEL -->
+      <div id="sidebarTrailPanel" class="hidden flex-1 flex flex-col min-h-0">
+        <div class="p-3.5 border-b border-white/[0.07] bg-emerald-500/5 space-y-2.5 shrink-0">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-xs font-bold text-emerald-300">🗺️ Trick-or-Treat Trail</h3>
+              <p id="trailDistanceText" class="text-[11px] text-zinc-400">Tap "+ Trail" on any house to build your route</p>
+            </div>
+            <button onclick="clearTrail()" class="px-2 py-1 rounded-lg bg-zinc-900 text-zinc-400 hover:text-white text-[10px] font-semibold border border-white/10">Clear</button>
+          </div>
+          <div class="grid grid-cols-2 gap-1.5">
+            <button onclick="optimizeTrailOrder()" class="py-2 px-2.5 rounded-xl bg-zinc-900 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold">⚡ Auto-Sort Closest</button>
+            <button onclick="openTrailInGoogleMaps()" class="py-2 px-2.5 rounded-xl bg-emerald-500 text-zinc-950 font-bold text-[11px]">🚶 Start Route ↗</button>
+          </div>
+        </div>
+        <div id="trailList" class="flex-1 overflow-y-auto p-3 space-y-2 min-h-0"></div>
+      </div>
+
+      <div class="px-4 py-2 bg-[#09090b] border-t border-white/[0.05] text-[10px] text-zinc-500 flex items-center justify-between shrink-0">
+        <span>By Amaan Hakim & Gemini Argon</span>
+        <div class="flex items-center gap-2.5">
+          <button onclick="openTutorial()" class="text-zinc-400 hover:text-white">Tutorial</button>
+          <button onclick="replayIntro()" class="text-orange-400 hover:underline">Intro</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAP -->
+    <main class="flex-1 relative bg-[#09090b] min-h-0">
+      <div id="placementBanner" class="hidden absolute top-3 left-1/2 -translate-x-1/2 z-[1000] w-[92%] max-w-sm bg-zinc-900/95 text-white px-3.5 py-2 rounded-2xl shadow-2xl border border-orange-500/50 flex items-center justify-between gap-2">
+        <span id="placementBannerText" class="text-xs font-medium truncate">Tap your villa inside the UAE</span>
+        <button onclick="playClickSfx(); cancelAddHouseMode()" class="px-2.5 py-1 bg-zinc-800 text-zinc-300 rounded-lg text-[11px] font-medium shrink-0">Cancel</button>
+      </div>
+      <div class="absolute right-3 z-[900] map-controls-bottom">
+        <div class="bg-[#0c0c0f]/90 p-1 rounded-xl border border-white/10 shadow-2xl flex gap-1 text-[11px]">
+          <button onclick="playClickSfx(); setMapLayer('dark')" id="layer-dark" class="px-2.5 py-1.5 rounded-lg bg-zinc-800 text-white font-medium">Dark</button>
+          <button onclick="playClickSfx(); setMapLayer('voyager')" id="layer-voyager" class="px-2.5 py-1.5 rounded-lg text-zinc-400 font-medium">Voyager</button>
+          <button onclick="playClickSfx(); setMapLayer('satellite')" id="layer-satellite" class="px-2.5 py-1.5 rounded-lg text-zinc-400 font-medium">Satellite</button>
+        </div>
+      </div>
+      <div id="map" class="w-full h-full z-10"></div>
+    </main>
+  </div>
+
+  <!-- REVIEWS & CANDY STATUS MODAL -->
+  <div id="reviewsModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 safe-top safe-bottom">
+    <div class="bg-[#121215] border border-white/10 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl max-h-[90dvh] flex flex-col">
+      <div class="px-5 py-3.5 border-b border-white/[0.08] flex items-center justify-between shrink-0">
+        <div class="min-w-0">
+          <span id="revModalComm" class="text-[10px] font-bold uppercase text-orange-400 block truncate"></span>
+          <h2 id="revModalTitle" class="text-sm font-bold text-white truncate">Villa Reviews & Candy Status</h2>
+        </div>
+        <button onclick="playClickSfx(); closeReviewsModal()" class="text-zinc-400 hover:text-white p-1"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+      <div class="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
+        <div class="p-3 rounded-2xl bg-zinc-900/90 border border-white/[0.07] space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-semibold text-zinc-300">🍬 Report Live Candy Status:</span>
+            <span id="revCurrentStatusBadge" class="text-[10px]"></span>
+          </div>
+          <div class="grid grid-cols-3 gap-1.5 text-[11px]">
+            <button type="button" onclick="reportCandyStatus('plenty')" id="statusBtn-plenty" class="py-2 px-2 rounded-xl bg-zinc-950 border border-white/10 text-zinc-300 font-semibold">🍬 Plenty</button>
+            <button type="button" onclick="reportCandyStatus('low')" id="statusBtn-low" class="py-2 px-2 rounded-xl bg-zinc-950 border border-white/10 text-zinc-300 font-semibold">⚡ Low</button>
+            <button type="button" onclick="reportCandyStatus('out')" id="statusBtn-out" class="py-2 px-2 rounded-xl bg-zinc-950 border border-white/10 text-zinc-300 font-semibold">💤 Out of Candy</button>
+          </div>
+        </div>
+        <form onsubmit="submitHouseReview(event)" class="p-3.5 rounded-2xl bg-zinc-900/60 border border-white/[0.07] space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-bold text-white">⭐ Rate & Leave a Comment</label>
+            <span class="text-[10px] text-emerald-400">🛡️ Family Filter</span>
+          </div>
+          <div class="flex items-center gap-1.5" id="starSelector">
+            <button type="button" onclick="selectStarRating(1, true)" class="star-btn text-xl">⭐</button>
+            <button type="button" onclick="selectStarRating(2, true)" class="star-btn text-xl">⭐</button>
+            <button type="button" onclick="selectStarRating(3, true)" class="star-btn text-xl">⭐</button>
+            <button type="button" onclick="selectStarRating(4, true)" class="star-btn text-xl">⭐</button>
+            <button type="button" onclick="selectStarRating(5, true)" class="star-btn text-xl">⭐</button>
+            <span id="selectedStarText" class="text-xs font-semibold text-amber-400 ml-1.5">5 / 5 Stars</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <input id="reviewAuthorInput" type="text" maxlength="28" required placeholder="Your Name / Costume" class="w-full px-3 py-2 bg-zinc-950 border border-white/10 rounded-xl text-xs text-white" />
+            <select id="reviewCandyReport" class="w-full px-2.5 py-2 bg-zinc-950 border border-white/10 rounded-xl text-xs text-zinc-200">
+              <option value="">Candy Status (Optional)</option>
+              <option value="plenty">🍬 Plenty of candy!</option>
+              <option value="low">⚡ Running low</option>
+              <option value="out">💤 Out of candy</option>
+            </select>
+          </div>
+          <textarea id="reviewCommentInput" rows="2" maxlength="160" required placeholder="Awesome decorations! Super friendly hosts..." class="w-full px-3 py-2 bg-zinc-950 border border-white/10 rounded-xl text-xs text-white"></textarea>
+          <button type="submit" id="submitReviewBtn" class="w-full py-2 rounded-xl bg-orange-500 hover:bg-orange-400 text-zinc-950 font-bold text-xs">Post Rating & Comment</button>
+        </form>
+        <div class="space-y-2">
+          <div class="flex items-center justify-between text-[11px] text-zinc-400">
+            <span class="font-semibold uppercase">Trick-or-Treater Reviews</span>
+            <span id="revModalAvgSummary" class="text-amber-400 font-bold"></span>
+          </div>
+          <div id="reviewsListContainer" class="space-y-2"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADD HOUSE MODAL -->
+  <div id="houseModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 safe-top safe-bottom">
+    <div class="bg-[#121215] border border-white/10 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl max-h-[90dvh] flex flex-col">
+      <div class="px-5 py-3.5 border-b border-white/[0.08] flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-2"><span class="text-lg">🎃</span><h2 class="text-sm font-semibold text-white">Add UAE Halloween House</h2></div>
+        <button onclick="playClickSfx(); closeHouseModal()" class="text-zinc-400 hover:text-white p-1"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+      <form id="houseForm" onsubmit="saveHouse(event)" class="p-4 sm:p-5 space-y-3.5 overflow-y-auto">
+        <input type="hidden" id="formLat" /><input type="hidden" id="formLng" />
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] font-medium text-zinc-400 mb-1">UAE Community / Area *</label>
+            <select id="formCommunity" onchange="toggleCustomCommunityInput()" required class="w-full px-3 py-2 bg-zinc-900 border border-white/10 rounded-xl text-xs text-white"></select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-zinc-400 mb-1">Cluster & Villa Number *</label>
+            <input id="formTitle" type="text" maxlength="45" required placeholder="e.g. Rahat 42 / Maple 118" class="w-full px-3 py-2 bg-zinc-900 border border-white/10 rounded-xl text-xs text-white" />
+          </div>
+        </div>
+        <div id="customCommunityWrapper" class="hidden">
+          <label class="block text-[11px] font-medium text-orange-400 mb-1">Enter Your Community & Emirate *</label>
+          <input id="formCustomCommunity" type="text" maxlength="40" placeholder="e.g. Green Community, Dubai" class="w-full px-3 py-2 bg-zinc-900 border border-orange-500/40 rounded-xl text-xs text-white" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] font-medium text-zinc-400 mb-1">Marker Icon</label>
+            <select id="formIcon" class="w-full px-3 py-2 bg-zinc-900 border border-white/10 rounded-xl text-xs text-white">
+              <option value="🎃">🎃 Pumpkin</option><option value="👻">👻 Ghost</option><option value="💀">💀 Skeleton</option>
+              <option value="🧙‍♀️">🧙‍♀️ Witch</option><option value="🍬">🍬 Candy Stop</option><option value="🕸️">🕸️ Haunted House</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-zinc-400 mb-1">Candy Status</label>
+            <select id="formStatus" class="w-full px-3 py-2 bg-zinc-900 border border-white/10 rounded-xl text-xs text-white">
+              <option value="plenty">🍬 Plenty of Candy</option><option value="low">⚡ Running Low</option><option value="out">💤 Out of Candy</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-[11px] font-medium text-zinc-400 mb-1">Details / Active Hours *</label>
+          <textarea id="formDesc" required rows="2" maxlength="180" placeholder="e.g. Active 5:30–8:30 PM, ring bell for treats!" class="w-full px-3 py-2 bg-zinc-900 border border-white/10 rounded-xl text-xs text-white"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <label class="flex items-center gap-2 p-2 rounded-xl bg-zinc-900 border border-white/[0.07]"><input type="checkbox" id="tagAllergy" class="accent-orange-500" /><span>🥜 Allergy Safe</span></label>
+          <label class="flex items-center gap-2 p-2 rounded-xl bg-zinc-900 border border-white/[0.07]"><input type="checkbox" id="tagScary" class="accent-orange-500" /><span>👻 Scary</span></label>
+          <label class="flex items-center gap-2 p-2 rounded-xl bg-zinc-900 border border-white/[0.07]"><input type="checkbox" id="tagToddler" class="accent-orange-500" /><span>👶 Toddler Friendly</span></label>
+          <label class="flex items-center gap-2 p-2 rounded-xl bg-zinc-900 border border-white/[0.07]"><input type="checkbox" id="tagPhoto" class="accent-orange-500" /><span>📸 Photo Op</span></label>
+        </div>
+        <div class="flex items-center gap-3">
+          <label class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-zinc-900 border border-dashed border-white/15 rounded-xl cursor-pointer">
+            <i data-lucide="camera" class="w-4 h-4 text-zinc-400"></i><span class="text-xs text-zinc-300">Upload Photo (Optional)</span>
+            <input type="file" id="formImageFile" accept="image/*" class="hidden" onchange="handleImageUpload(event)" />
+          </label>
+          <div id="imagePreviewContainer" class="hidden w-11 h-11 rounded-xl overflow-hidden border border-white/20 relative shrink-0">
+            <img id="imagePreview" src="" class="w-full h-full object-cover" />
+            <button type="button" onclick="clearUploadedImage()" class="absolute top-0.5 right-0.5 bg-black/80 text-white rounded-full p-0.5"><i data-lucide="x" class="w-3 h-3"></i></button>
+          </div>
+        </div>
+        <div class="pt-3 border-t border-white/[0.08] flex items-center justify-end gap-2">
+          <button type="button" onclick="playClickSfx(); closeHouseModal()" class="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-300 text-xs font-medium">Cancel</button>
+          <button type="submit" id="submitVillaBtn" class="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-400 text-zinc-950 font-semibold text-xs">Publish Villa</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const BLOCKED_WORDS_REGEX = /\b(fuck|fucker|fucking|fck|fuk|shit|shitty|bullshit|bitch|bitches|asshole|bastard|dick|cock|pussy|cunt|whore|slut|nigger|nigga|faggot|fag|retard|retarded|porn|sex|nude|nudes|kill yourself|kys|penis|vagina|boobs|tits|wank|twat|prick|cum|jizz|dildo|rape|rapist|molest|pedophile|pedo|terrorist|bomb|isis|nazi|hitler)\b/i;
+    const INJECTION_OR_LINK_REGEX = /(<script|javascript:|onerror=|onload=|<iframe|<svg|drop\s+table|delete\s+from|insert\s+into|https?:\/\/|www\.|discord\.gg|t\.me\/)/i;
+    const ALLOWED_ICONS = ['🎃', '👻', '💀', '🧙‍♀️', '🍬', '🕸️'];
+    const ALLOWED_STATUS = ['plenty', 'low', 'out'];
+
+    function isUnsafeText(t) {
+      if (!t) return false;
+      const s = String(t), norm = s.toLowerCase().replace(/[@4]/g,'a').replace(/[3]/g,'e').replace(/[1!|]/g,'i').replace(/[0]/g,'o').replace(/[$5]/g,'s');
+      return BLOCKED_WORDS_REGEX.test(s) || BLOCKED_WORDS_REGEX.test(norm) || INJECTION_OR_LINK_REGEX.test(s);
+    }
+    function escapeHtml(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+    function sanitizeImageSrc(s) { return (typeof s === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(s) && s.length < 350000) ? s : ''; }
+    function isInsideUAE(lat, lng) { return !isNaN(lat) && !isNaN(lng) && lat >= 22.45 && lat <= 26.25 && lng >= 51.35 && lng <= 56.55; }
+    function getStorageMap(k) { try { return JSON.parse(localStorage.getItem(k) || '{}'); } catch (_) { return {}; } }
+    function setStorageMap(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} }
+
+    function getDeviceOwnerSecret() {
+      let s = localStorage.getItem('spookymap_owner_secret_v1');
+      if (!s) { s = 'own_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2); localStorage.setItem('spookymap_owner_secret_v1', s); }
+      return s;
+    }
+    function computeOwnerSignature(id) {
+      const str = getDeviceOwnerSecret() + '::' + id;
+      let h = 2166136261;
+      for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+      return 'sig_' + (h >>> 0).toString(16);
+    }
+    function isMyHouse(h) {
+      if (!h) return false;
+      return !!(getStorageMap('spookymap_my_villas_v1')[h.id] || (h.ownerSig && h.ownerSig === computeOwnerSignature(h.id)));
+    }
+
+    // AUDIO ENGINE (4 TRACKS + SPECIAL SFX)
+    let audioCtx = null, masterGain = null, musicBus = null, schedulerTimer = null, isMuted = false, currentVolume = 0.35, splashDismissed = false, nextNoteTime = 0, currentStep = 0, currentTrackIndex = 0;
+    const HALLOWEEN_TRACKS = [
+      { name: 'Song 1', lead: [659.25,0,587.33,0,523.25,0,493.88,0,440,523.25,659.25,0,493.88,0,415.3,0,659.25,0,783.99,0,698.46,0,659.25,0,587.33,523.25,493.88,523.25,440,0,880,0], bass: [220,0,329.63,0,261.63,0,329.63,0,220,0,329.63,0,246.94,0,329.63,0,220,0,329.63,0,293.66,0,349.23,0,246.94,0,329.63,0,220,0,220,0] },
+      { name: 'Song 2', lead: [587.33,0,698.46,587.33,554.37,0,587.33,0,659.25,698.46,783.99,698.46,659.25,587.33,554.37,0,587.33,0,880,0,783.99,698.46,659.25,0,587.33,554.37,587.33,698.46,587.33,0,1174.66,0], bass: [146.83,0,220,293.66,185,0,220,0,196,0,293.66,0,220,0,185,0,146.83,0,220,0,196,0,293.66,0,220,0,185,0,146.83,0,293.66,0] },
+      { name: 'Song 3', lead: [493.88,587.33,659.25,739.99,783.99,739.99,659.25,587.33,523.25,659.25,783.99,0,739.99,659.25,587.33,0,659.25,0,987.77,0,880,783.99,739.99,659.25,587.33,659.25,739.99,587.33,659.25,0,659.25,0], bass: [164.81,0,246.94,0,196,0,246.94,0,130.81,0,196,0,185,0,246.94,0,164.81,0,246.94,0,220,0,196,0,185,0,246.94,0,164.81,0,329.63,0] },
+      { name: 'Song 4', lead: [523.25,0,622.25,0,783.99,0,739.99,698.46,622.25,0,523.25,0,493.88,523.25,587.33,0,523.25,622.25,783.99,1046.5,932.33,783.99,698.46,622.25,587.33,622.25,698.46,493.88,523.25,0,1046.5,0], bass: [130.81,0,196,0,155.56,0,196,0,174.61,0,261.63,0,146.83,0,196,0,130.81,0,196,0,174.61,0,233.08,0,196,0,146.83,0,130.81,0,261.63,0] }
+    ];
+
+    function initAudioEngine() {
+      if (!audioCtx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        audioCtx = new AC();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.value = isMuted ? 0 : currentVolume;
+        masterGain.connect(audioCtx.destination);
+        musicBus = audioCtx.createBiquadFilter();
+        musicBus.type = 'lowpass'; musicBus.frequency.value = 2400;
+        const delay = audioCtx.createDelay(), fb = audioCtx.createGain();
+        delay.delayTime.value = 0.24; fb.gain.value = 0.22;
+        musicBus.connect(masterGain); musicBus.connect(delay); delay.connect(fb); fb.connect(delay); delay.connect(masterGain);
+      }
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function scheduleSmoothTone(freq, startTime, duration, peakGain, waveType = 'sine') {
+      if (!audioCtx || freq <= 0) return;
+      const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+      osc.type = waveType; osc.frequency.setValueAtTime(freq, startTime);
+      gain.gain.setValueAtTime(0.0001, startTime);
+      gain.gain.linearRampToValueAtTime(peakGain, startTime + 0.025);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+      osc.connect(gain); gain.connect(musicBus);
+      osc.start(startTime); osc.stop(startTime + duration + 0.02);
+    }
+
+    function startBackgroundMusic() {
+      initAudioEngine();
+      if (!audioCtx || schedulerTimer) return;
+      nextNoteTime = audioCtx.currentTime + 0.08;
+      schedulerTimer = setInterval(() => {
+        if (!audioCtx || audioCtx.state !== 'running') return;
+        while (nextNoteTime < audioCtx.currentTime + 0.15) {
+          if (!isMuted) {
+            if (currentStep > 0 && currentStep % 64 === 0) {
+              currentTrackIndex = (currentTrackIndex + 1) % HALLOWEEN_TRACKS.length;
+              const lbl = document.getElementById('trackNumLabel');
+              if (lbl) lbl.textContent = HALLOWEEN_TRACKS[currentTrackIndex].name;
+            }
+            const tr = HALLOWEEN_TRACKS[currentTrackIndex], st = currentStep % 32;
+            if (tr.lead[st] > 0) { scheduleSmoothTone(tr.lead[st], nextNoteTime, 0.36, 0.14, 'sine'); scheduleSmoothTone(tr.lead[st] * 2, nextNoteTime, 0.18, 0.03, 'sine'); }
+            if (tr.bass[st] > 0) scheduleSmoothTone(tr.bass[st], nextNoteTime, 0.42, 0.10, 'triangle');
+          }
+          nextNoteTime += 0.21; currentStep++;
+        }
+      }, 40);
+    }
+
+    function playBooSfx() { initAudioEngine(); if (!audioCtx || isMuted) return; const n = audioCtx.currentTime; scheduleSmoothTone(523.25, n, 0.18, 0.22); scheduleSmoothTone(783.99, n + 0.12, 0.22, 0.22); scheduleSmoothTone(659.25, n + 0.26, 0.35, 0.22); }
+    function playClickSfx() { initAudioEngine(); if (!audioCtx || isMuted) return; scheduleSmoothTone(587.33, audioCtx.currentTime, 0.06, 0.12); }
+    function playAddVillaSfx() { initAudioEngine(); if (!audioCtx || isMuted) return; const n = audioCtx.currentTime; [440, 554.37, 659.25, 880, 1108.73, 1318.51].forEach((f, i) => { scheduleSmoothTone(f, n + i * 0.075, 0.42, 0.2, 'triangle'); scheduleSmoothTone(f * 1.5, n + i * 0.075, 0.28, 0.08, 'sine'); }); }
+    function playStarSfx(stars, isSub) { initAudioEngine(); if (!audioCtx || isMuted) return; const n = audioCtx.currentTime, p = [523.25, 587.33, 659.25, 783.99, 1046.5]; if (!isSub) { const f = p[Math.min(4, Math.max(0, (stars || 5) - 1))]; scheduleSmoothTone(f, n, 0.22, 0.2); scheduleSmoothTone(f * 2, n + 0.03, 0.18, 0.08); } else p.slice(0, stars || 5).forEach((f, i) => scheduleSmoothTone(f, n + i * 0.055, 0.28, 0.18)); }
+    function playVisitedRewardSfx() { initAudioEngine(); if (!audioCtx || isMuted) return; const n = audioCtx.currentTime; scheduleSmoothTone(987.77, n, 0.11, 0.22); scheduleSmoothTone(1318.51, n + 0.09, 0.35, 0.25); [523.25, 659.25, 783.99, 1046.5, 1567.98].forEach((f, i) => scheduleSmoothTone(f, n + 0.22 + i * 0.065, 0.38, 0.18, 'triangle')); }
+
+    function nextMusicTrack() { initAudioEngine(); startBackgroundMusic(); currentTrackIndex = (currentTrackIndex + 1) % HALLOWEEN_TRACKS.length; currentStep = 0; const lbl = document.getElementById('trackNumLabel'); if (lbl) lbl.textContent = HALLOWEEN_TRACKS[currentTrackIndex].name; playClickSfx(); }
+    function handleVolumeChange(v) { const num = Math.max(0, Math.min(100, Number(v) || 0)); currentVolume = num / 100; document.getElementById('volumeSlider').value = num; const ms = document.getElementById('mobileVolumeSlider'); if (ms) ms.value = num; isMuted = num === 0; initAudioEngine(); startBackgroundMusic(); if (masterGain && audioCtx) masterGain.gain.setTargetAtTime(isMuted ? 0 : currentVolume, audioCtx.currentTime, 0.03); updateVolumeUI(); }
+    function toggleMute() { initAudioEngine(); startBackgroundMusic(); isMuted = !isMuted; if (!isMuted && currentVolume === 0) handleVolumeChange(35); else if (masterGain && audioCtx) masterGain.gain.setTargetAtTime(isMuted ? 0 : currentVolume, audioCtx.currentTime, 0.03); if (!isMuted) playClickSfx(); updateVolumeUI(); }
+    function updateVolumeUI() { const b = document.getElementById('muteBtn'); if (!b) return; b.innerHTML = `<i data-lucide="${isMuted || currentVolume === 0 ? 'volume-x' : currentVolume < 0.45 ? 'volume-1' : 'volume-2'}" class="w-3.5 h-3.5 ${isMuted || currentVolume === 0 ? 'text-zinc-500' : 'text-orange-400'}"></i>`; lucide.createIcons(); }
+
+    // TUTORIAL
+    const TUTORIAL_STEPS = [
+      { icon: '🎃', title: 'Explore UAE Halloween Houses', desc: 'Use the community selector at the top to jump to Mudon, DAMAC Hills, Arabian Ranches, Abu Dhabi, Sharjah, or anywhere in the UAE.' },
+      { icon: '✅', title: 'Mark Villas as Visited (or Unvisit)', desc: 'Tap "Visit" on any house as you Trick-or-Treat to hear a reward chime and save your completed houses on your device! Tap again anytime to Unvisit.' },
+      { icon: '🗺️', title: 'Build Your Trick-or-Treat Trail', desc: 'Tap "+ Trail" on houses to connect them with a glowing route line and open the multi-stop walking route in Google Maps.' },
+      { icon: '⭐', title: 'Rate Villas & Report Candy Status', desc: 'Tap "Reviews" on any house to rate 1–5 stars, leave a comment, or report if a house is Out of Candy.' },
+      { icon: '🔑', title: 'Add & Manage Your Own Villa', desc: 'Tap "+ Add" to place your house on the map. Only YOUR device gets the special keys to Move your pin or Remove your house!' }
+    ];
+    let tutStep = 0;
+    function openTutorial() { tutStep = 0; renderTutorialStep(); document.getElementById('tutorialModal').classList.remove('hidden'); }
+    function renderTutorialStep() {
+      const s = TUTORIAL_STEPS[tutStep];
+      document.getElementById('tutStepBadge').textContent = `Step ${tutStep + 1} of ${TUTORIAL_STEPS.length}`;
+      document.getElementById('tutIcon').textContent = s.icon;
+      document.getElementById('tutTitle').textContent = s.title;
+      document.getElementById('tutDesc').textContent = s.desc;
+      document.getElementById('tutNextBtn').textContent = tutStep === TUTORIAL_STEPS.length - 1 ? "Let's Go! 🎃" : 'Next →';
+      document.getElementById('tutDots').innerHTML = TUTORIAL_STEPS.map((_, i) => `<span class="h-1.5 rounded-full transition-all ${i === tutStep ? 'w-5 bg-orange-500' : 'w-1.5 bg-zinc-700'}"></span>`).join('');
+    }
+    function nextTutorialStep() { playClickSfx(); if (tutStep < TUTORIAL_STEPS.length - 1) { tutStep++; renderTutorialStep(); } else finishTutorial(); }
+    function finishTutorial() { playClickSfx(); localStorage.setItem('spookymap_tutorial_seen_v2', 'true'); document.getElementById('tutorialModal').classList.add('hidden'); }
+    function dismissSplash(fromUser) { if (splashDismissed) return; splashDismissed = true; if (fromUser) { playBooSfx(); startBackgroundMusic(); } document.getElementById('introSplash').classList.add('hide-splash'); setTimeout(() => { map.invalidateSize(); if (!localStorage.getItem('spookymap_tutorial_seen_v2')) openTutorial(); }, 300); }
+    function replayIntro() { splashDismissed = false; document.getElementById('introSplash').classList.remove('hide-splash'); playBooSfx(); }
+    setTimeout(() => dismissSplash(false), 4600);
+    window.addEventListener('pointerdown', function u() { initAudioEngine(); startBackgroundMusic(); window.removeEventListener('pointerdown', u); }, { once: true });
+
+    // FX & CREATOR BROADCASTS
+    function runCandyRainFX(cnt = 65) {
+      const layer = document.getElementById('fxLayer'), c = ['🍬', '🍭', '🍫', '🎃', '🧁', '🍩', '✨'];
+      for (let i = 0; i < cnt; i++) {
+        const el = document.createElement('div'); el.className = 'candy-drop'; el.textContent = c[Math.floor(Math.random() * c.length)];
+        el.style.left = Math.random() * 98 + 'vw'; el.style.fontSize = (20 + Math.random() * 20) + 'px';
+        el.style.setProperty('--dur', (2.3 + Math.random() * 2.2) + 's'); el.style.setProperty('--drift', ((Math.random() - 0.5) * 160) + 'px');
+        el.style.animationDelay = (Math.random() * 1.1) + 's'; layer.appendChild(el); setTimeout(() => el.remove(), 5000);
+      }
+    }
+    let welcomeTimeout = null, bannerTimeout = null;
+    function showWelcomePumpkinFX(sub) { playAddVillaSfx(); runCandyRainFX(70); document.getElementById('welcomePumpkinSub').textContent = sub || 'Happy Trick-or-Treating across the UAE! Stay safe & enjoy the candy! 🍬✨'; document.getElementById('welcomePumpkinOverlay').classList.remove('hidden'); clearTimeout(welcomeTimeout); welcomeTimeout = setTimeout(hideWelcomePumpkin, 6500); }
+    function hideWelcomePumpkin() { document.getElementById('welcomePumpkinOverlay').classList.add('hidden'); }
+    function runGhostParadeFX() { playBooSfx(); const layer = document.getElementById('fxLayer'), fl = ['👻', '🦇', '🎃', '👻', '✨']; for (let i = 0; i < 24; i++) { const el = document.createElement('div'); el.className = 'ghost-flyer'; el.textContent = fl[i % fl.length]; el.style.top = (8 + Math.random() * 80) + 'vh'; el.style.fontSize = (26 + Math.random() * 24) + 'px'; el.style.setProperty('--dur', (3 + Math.random() * 2.2) + 's'); el.style.animationDelay = (Math.random() * 1.2) + 's'; layer.appendChild(el); setTimeout(() => el.remove(), 5600); } }
+    function showLiveBroadcastBanner(m) { if (isUnsafeText(m)) return; document.getElementById('liveBroadcastText').textContent = m; document.getElementById('liveBroadcastBanner').classList.remove('hidden'); lucide.createIcons(); clearTimeout(bannerTimeout); bannerTimeout = setTimeout(dismissBroadcastBanner, 14000); }
+    function dismissBroadcastBanner() { document.getElementById('liveBroadcastBanner').classList.add('hidden'); }
+    function executeIncomingAdminFX(p) { if (!p) return; if (p.type === 'candy_rain') { playVisitedRewardSfx(); runCandyRainFX(70); } else if (p.type === 'welcome_pumpkin') showWelcomePumpkinFX(p.message); else if (p.type === 'ghost_parade') runGhostParadeFX(); else if (p.type === 'broadcast' && p.message && !isUnsafeText(p.message)) { showLiveBroadcastBanner(p.message); if (p.withPumpkin) showWelcomePumpkinFX(p.message); else playVisitedRewardSfx(); } }
+
+    // SUPABASE & UAE COMMUNITIES
+    const SUPABASE_REST_URL = 'https://ojuljfzhbgycemzwapca.supabase.co/rest/v1', SUPABASE_PROJECT_URL = 'https://ojuljfzhbgycemzwapca.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qdWxqZnpoYmd5Y2VtendhcGNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMDczOTgsImV4cCI6MjEwODc4MzM5OH0._reYqLhUCdidf0WKUXe2Dco6tAMCBLwhZhEs1F6Z6lM';
+    const SUPABASE_HEADERS = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+    const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_PROJECT_URL, SUPABASE_ANON_KEY) : null;
+
+    const COORDS = {
+      uae: { center: [24.85, 55.2], zoom: 9.2 }, both: { center: [25.0235, 55.2605], zoom: 14.3 },
+      dubai: { center: [25.09, 55.27], zoom: 11.4, label: '📍 All Dubai', group: 'Dubai Communities' },
+      mudon: { center: [25.0225, 55.269], zoom: 15.3, communityName: 'Mudon', group: 'Dubai Communities' },
+      dh1: { center: [25.0246, 55.252], zoom: 15.3, communityName: 'DAMAC Hills 1', group: 'Dubai Communities' },
+      dh2: { center: [24.854, 55.385], zoom: 14.8, communityName: 'DAMAC Hills 2', group: 'Dubai Communities' },
+      ranches1: { center: [25.0485, 55.271], zoom: 14.5, communityName: 'Arabian Ranches 1 & 2', group: 'Dubai Communities' },
+      ranches3: { center: [25.068, 55.326], zoom: 15, communityName: 'Arabian Ranches 3', group: 'Dubai Communities' },
+      dubaihills: { center: [25.111, 55.248], zoom: 14.5, communityName: 'Dubai Hills Estate', group: 'Dubai Communities' },
+      springs: { center: [25.059, 55.182], zoom: 14.5, communityName: 'The Springs / Meadows / Lakes', group: 'Dubai Communities' },
+      townsquare: { center: [25.011, 55.289], zoom: 14.8, communityName: 'Town Square & Mira', group: 'Dubai Communities' },
+      tilalalghaf: { center: [25.0275, 55.228], zoom: 14.8, communityName: 'Tilal Al Ghaf & Victory Heights', group: 'Dubai Communities' },
+      jvt: { center: [25.047, 55.193], zoom: 14.4, communityName: 'Jumeirah Park / JVT / JVC', group: 'Dubai Communities' },
+      alfurjan: { center: [25.028, 55.148], zoom: 14.6, communityName: 'Al Furjan', group: 'Dubai Communities' },
+      villanova: { center: [25.069, 55.362], zoom: 14.6, communityName: 'Villanova & The Villa', group: 'Dubai Communities' },
+      sustainable: { center: [25.0285, 55.2765], zoom: 15.2, communityName: 'The Sustainable City', group: 'Dubai Communities' },
+      palm: { center: [25.1124, 55.139], zoom: 14.2, communityName: 'Palm Jumeirah', group: 'Dubai Communities' },
+      mirdif: { center: [25.218, 55.424], zoom: 14.3, communityName: 'Mirdif', group: 'Dubai Communities' },
+      albarari: { center: [25.102, 55.317], zoom: 14.2, communityName: 'Al Barari & Nad Al Sheba', group: 'Dubai Communities' },
+      abudhabi: { center: [24.4539, 54.52], zoom: 11.4, label: '📍 All Abu Dhabi', group: 'Abu Dhabi' },
+      yasisland: { center: [24.495, 54.605], zoom: 13.8, communityName: 'Yas Island & Al Raha (Abu Dhabi)', group: 'Abu Dhabi' },
+      saadiyat: { center: [24.54, 54.44], zoom: 13.8, communityName: 'Saadiyat Island (Abu Dhabi)', group: 'Abu Dhabi' },
+      alreef: { center: [24.452, 54.675], zoom: 14, communityName: 'Al Reef & Khalifa City (Abu Dhabi)', group: 'Abu Dhabi' },
+      alain: { center: [24.2075, 55.7447], zoom: 12.2, communityName: 'Al Ain', group: 'Abu Dhabi' },
+      sharjah: { center: [25.315, 55.48], zoom: 12.5, communityName: 'Aljada & Masaar (Sharjah)', group: 'Sharjah & Northern Emirates' },
+      rak: { center: [25.695, 55.795], zoom: 13, communityName: 'Al Hamra & Mina Al Arab (RAK)', group: 'Sharjah & Northern Emirates' },
+      ajman: { center: [25.4052, 55.5136], zoom: 12.2, communityName: 'Ajman / UAQ / Fujairah', group: 'Sharjah & Northern Emirates' }
+    };
+
+    function populateUAECommunitySelectors() {
+      const groups = {};
+      Object.entries(COORDS).forEach(([k, v]) => { if (!v.group) return; if (!groups[v.group]) groups[v.group] = []; groups[v.group].push({ key: k, label: v.communityName || v.label, commName: v.communityName }); });
+      const navHtml = Object.entries(groups).map(([g, items]) => `<optgroup label="${g}">` + items.map(i => `<option value="${i.key}">${i.label}</option>`).join('') + `</optgroup>`).join('');
+      document.getElementById('desktopAreaSelect').innerHTML = `<option value="both">Jump to UAE Community...</option><option value="uae">🇦🇪 Entire UAE Overview</option>` + navHtml;
+      document.getElementById('mobileAreaSelect').innerHTML = `<option value="both">📍 Mudon & DAMAC Hills 1</option><option value="uae">🇦🇪 Entire UAE Overview</option>` + navHtml;
+      document.getElementById('formCommunity').innerHTML = Object.entries(groups).map(([g, items]) => `<optgroup label="${g}">` + items.filter(i => i.commName).map(i => `<option value="${i.commName}">${i.commName}</option>`).join('') + `</optgroup>`).join('') + `<optgroup label="Other UAE Area"><option value="__custom__">✨ Other Community (Type Below)...</option></optgroup>`;
+    }
+
+    let housesMap = {}, currentFilter = 'all', isAddingHouse = false, movingHouseId = null, uploadedBase64Image = '';
+    let markersLayer = L.layerGroup(), trailLayer = L.layerGroup(), userLocationMarker = null, userAccuracyCircle = null;
+    let activeReviewHouseId = null, currentSelectedStars = 5, trailIds = [];
+    try { trailIds = JSON.parse(localStorage.getItem('spookymap_trail_ids') || '[]'); } catch (_) { trailIds = []; }
+
+    const CARTO_URL = 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=cb1_4x1b_1_ab4b1fa2f97ec58b284fa30c';
+    const map = L.map('map', { center: COORDS.both.center, zoom: COORDS.both.zoom, zoomControl: false, attributionControl: false, preferCanvas: true });
+    L.control.zoom({ position: 'topright' }).addTo(map);
+    const darkVoyagerLayer = L.tileLayer(CARTO_URL, { maxZoom: 20, className: 'carto-voyager-dark' });
+    const lightVoyagerLayer = L.tileLayer(CARTO_URL, { maxZoom: 20 });
+    const plainSatelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] });
+    darkVoyagerLayer.addTo(map); trailLayer.addTo(map); markersLayer.addTo(map);
+    window.addEventListener('resize', () => map.invalidateSize());
+
+    function formatRow(r) {
+      const rawTags = Array.isArray(r.tags) ? r.tags : [], own = rawTags.find(i => i && typeof i === 'object' && i.type === 'owner');
+      return {
+        id: String(r.id || ''), community: String(r.community || 'UAE').slice(0, 60), title: String(r.title || '').slice(0, 60),
+        lat: Number(r.lat), lng: Number(r.lng), icon: ALLOWED_ICONS.includes(r.icon) ? r.icon : '🎃',
+        status: ALLOWED_STATUS.includes(r.status) ? r.status : 'plenty', desc: String(r.description || '').slice(0, 220),
+        rawTags, tags: rawTags.filter(i => typeof i === 'string'), ownerSig: own ? own.sig : '',
+        reviews: rawTags.filter(i => i && typeof i === 'object' && i.type === 'review' && !isUnsafeText(i.text) && !isUnsafeText(i.author)),
+        likes: Math.max(0, Number(r.likes || 0)), image: sanitizeImageSrc(r.image), createdAt: Number(r.created_at || Date.now())
+      };
+    }
+
+    function getHouseRatingSummary(h) {
+      const revs = h.reviews || [];
+      if (!revs.length) return { avg: 0, count: 0, label: 'No ratings' };
+      const avg = (revs.reduce((a, r) => a + Math.min(5, Math.max(1, Number(r.rating) || 5)), 0) / revs.length).toFixed(1);
+      return { avg, count: revs.length, label: `⭐ ${avg} (${revs.length})` };
+    }
+
+    function isVillaVisited(id) { return !!getStorageMap('spookymap_visited_villas_v1')[id]; }
+    function toggleVisitedVilla(id) {
+      const v = getStorageMap('spookymap_visited_villas_v1');
+      if (v[id]) { delete v[id]; setStorageMap('spookymap_visited_villas_v1', v); playClickSfx(); }
+      else { v[id] = Date.now(); setStorageMap('spookymap_visited_villas_v1', v); playVisitedRewardSfx(); runCandyRainFX(24); }
+      renderUI();
+    }
+
+    function startMoveHouseMode(id) {
+      const h = housesMap[id];
+      if (!h || !isMyHouse(h)) return alert('Only the device that added this villa can move its pin.');
+      playClickSfx(); movingHouseId = id; isAddingHouse = false; map.closePopup();
+      document.getElementById('placementBannerText').textContent = `Tap new location for "${h.title}"`;
+      document.getElementById('placementBanner').classList.remove('hidden');
+      document.getElementById('map').style.cursor = 'crosshair';
+      if (window.innerWidth < 640) document.getElementById('sidebar').classList.add('-translate-x-full');
+    }
+
+    async function deleteMyHouse(id) {
+      const h = housesMap[id];
+      if (!h || !isMyHouse(h)) return alert('Only the person who added this villa can remove it.');
+      if (!confirm(`Remove your villa "${h.title}" from SpookyMap UAE?`)) return;
+      playClickSfx(); delete housesMap[id];
+      const m = getStorageMap('spookymap_my_villas_v1'); delete m[id]; setStorageMap('spookymap_my_villas_v1', m);
+      renderUI();
+      await fetch(`${SUPABASE_REST_URL}/houses?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: SUPABASE_HEADERS });
+    }
+
+    async function fetchHousesFromSupabase() {
+      try {
+        const res = await fetch(`${SUPABASE_REST_URL}/houses?select=*&order=created_at.desc`, { method: 'GET', headers: SUPABASE_HEADERS });
+        if (!res.ok) return;
+        const data = await res.json(), next = {};
+        (data || []).forEach(r => { const f = formatRow(r); if (isInsideUAE(f.lat, f.lng) && !isUnsafeText(f.title)) next[f.id] = f; });
+        housesMap = next; trailIds = trailIds.filter(id => !!housesMap[id]);
+        updateSidebarCommunityFilterOptions(); renderUI();
+        if (activeReviewHouseId && housesMap[activeReviewHouseId]) renderReviewsModalContent(activeReviewHouseId);
+      } catch (_) {}
+    }
+
+    function subscribeToRealtimeHousesAndAdminFX() {
+      if (!supabaseClient) return;
+      supabaseClient.channel('public:houses').on('postgres_changes', { event: '*', schema: 'public', table: 'houses' }, p => {
+        if (p.eventType === 'DELETE') delete housesMap[p.old.id];
+        else if (p.new) { const f = formatRow(p.new); if (isInsideUAE(f.lat, f.lng) && !isUnsafeText(f.title)) housesMap[f.id] = f; }
+        updateSidebarCommunityFilterOptions(); renderUI();
+        if (activeReviewHouseId && housesMap[activeReviewHouseId]) renderReviewsModalContent(activeReviewHouseId);
+      }).subscribe();
+      supabaseClient.channel('spookymap_live_fx').on('broadcast', { event: 'admin_fx' }, ({ payload }) => executeIncomingAdminFX(payload)).subscribe();
+    }
+
+    function getHousesArray() { return Object.values(housesMap).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); }
+    function updateSidebarCommunityFilterOptions() {
+      const sel = document.getElementById('communityFilterSelect'); if (!sel) return;
+      const cur = sel.value, set = new Set(['Mudon', 'DAMAC Hills 1']);
+      Object.values(housesMap).forEach(h => { if (h.community) set.add(h.community); });
+      sel.innerHTML = `<option value="all">🌍 Showing All UAE Communities</option>` + Array.from(set).sort().map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+      if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+    }
+
+    // TRAIL BUILDER
+    function saveTrailState() { try { localStorage.setItem('spookymap_trail_ids', JSON.stringify(trailIds)); } catch (_) {} }
+    function toggleTrailStop(id) { playClickSfx(); const i = trailIds.indexOf(id); if (i >= 0) trailIds.splice(i, 1); else trailIds.push(id); saveTrailState(); renderUI(); }
+    function clearTrail() { playClickSfx(); trailIds = []; saveTrailState(); renderUI(); }
+    function calcDistanceKm(lat1, lon1, lat2, lon2) { const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180, a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2; return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); }
+    function optimizeTrailOrder() {
+      playClickSfx(); const valid = trailIds.map(id => housesMap[id]).filter(Boolean); if (valid.length < 3) return;
+      const ord = [valid[0]], rem = valid.slice(1);
+      while (rem.length) { const last = ord[ord.length - 1]; let bi = 0, bd = Infinity; rem.forEach((c, i) => { const d = calcDistanceKm(last.lat, last.lng, c.lat, c.lng); if (d < bd) { bd = d; bi = i; } }); ord.push(rem.splice(bi, 1)[0]); }
+      trailIds = ord.map(h => h.id); saveTrailState(); renderUI();
+    }
+    function openTrailInGoogleMaps() {
+      const s = trailIds.map(id => housesMap[id]).filter(Boolean);
+      if (!s.length) return alert('Add at least 1 house to your Trail first!');
+      if (s.length === 1) return window.open(`https://www.google.com/maps/dir/?api=1&destination=${s[0].lat},${s[0].lng}&travelmode=walking`, '_blank');
+      const orig = `${s[0].lat},${s[0].lng}`, dest = `${s[s.length - 1].lat},${s[s.length - 1].lng}`, wp = s.slice(1, -1).map(x => `${x.lat},${x.lng}`).join('|');
+      window.open(`https://www.google.com/maps/dir/?api=1&origin=${orig}&destination=${dest}${wp ? '&waypoints=' + encodeURIComponent(wp) : ''}&travelmode=walking`, '_blank');
+    }
+
+    function renderTrailMapAndPanel() {
+      trailLayer.clearLayers();
+      const stops = trailIds.map(id => housesMap[id]).filter(Boolean);
+      document.getElementById('headerTrailCount').textContent = stops.length;
+      document.getElementById('sidebarTrailCount').textContent = stops.length;
+      let km = 0; for (let i = 1; i < stops.length; i++) km += calcDistanceKm(stops[i-1].lat, stops[i-1].lng, stops[i].lat, stops[i].lng);
+      if (stops.length >= 2) {
+        const pts = stops.map(s => [s.lat, s.lng]);
+        L.polyline(pts, { color: '#10b981', weight: 6, opacity: 0.25 }).addTo(trailLayer);
+        L.polyline(pts, { color: '#34d399', weight: 3, dashArray: '8, 10', className: 'trail-line-anim' }).addTo(trailLayer);
+      }
+      document.getElementById('trailDistanceText').textContent = !stops.length ? 'Tap "+ Trail" on any house to build your route' : `${stops.length} stops • Approx. ${km.toFixed(2)} km trail`;
+      const listEl = document.getElementById('trailList');
+      if (!stops.length) { listEl.innerHTML = `<div class="text-center py-12 px-4 text-xs text-zinc-500">Tap "+ Trail" on houses to connect them into a walking route!</div>`; return; }
+      listEl.innerHTML = stops.map((h, i) => `<div onclick="focusHouse('${escapeHtml(h.id)}')" class="p-2.5 rounded-xl bg-zinc-900/80 border border-emerald-500/30 flex items-center justify-between gap-2 cursor-pointer"><div class="flex items-center gap-2.5 min-w-0"><span class="w-6 h-6 rounded-full bg-emerald-500 text-zinc-950 font-extrabold text-xs flex items-center justify-center shrink-0">${i + 1}</span><div class="min-w-0"><p class="text-[10px] font-semibold text-emerald-400 truncate">${escapeHtml(h.community)}</p><h4 class="text-xs font-bold text-white truncate">${escapeHtml(h.icon)} ${escapeHtml(h.title)}</h4></div></div><button onclick="event.stopPropagation(); toggleTrailStop('${escapeHtml(h.id)}')" class="px-2 py-1 rounded-lg bg-zinc-800 text-zinc-400 hover:text-red-300 text-[10px] font-semibold">Remove</button></div>`).join('');
+    }
+
+    function switchSidebarMode(m) {
+      playClickSfx(); const isH = m === 'houses';
+      document.getElementById('sidebarHousesPanel').classList.toggle('hidden', !isH);
+      document.getElementById('sidebarTrailPanel').classList.toggle('hidden', isH);
+      document.getElementById('sideTab-houses').className = isH ? 'flex-1 py-1.5 rounded-lg text-xs font-semibold bg-zinc-800 text-white' : 'flex-1 py-1.5 rounded-lg text-xs font-semibold text-zinc-400';
+      document.getElementById('sideTab-trail').className = !isH ? 'flex-1 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 text-zinc-950' : 'flex-1 py-1.5 rounded-lg text-xs font-semibold text-zinc-400';
+    }
+    function openSidebarTab(m) { switchSidebarMode(m); if (window.innerWidth < 640) document.getElementById('sidebar').classList.remove('-translate-x-full'); }
+
+    // RENDER MAP & LIST
+    function getStatusBadgeHtml(st) {
+      return { plenty: `<span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">🍬 Plenty</span>`, low: `<span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">⚡ Low</span>`, out: `<span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/20">💤 Out</span>` }[st] || '';
+    }
+
+    function renderUI() {
+      const vMap = getStorageMap('spookymap_visited_villas_v1');
+      const vb = document.getElementById('visitedCountBadge'); if (vb) vb.textContent = Object.keys(vMap).filter(id => !!housesMap[id]).length;
+      renderTrailMapAndPanel(); renderMarkers(); renderHouseList(); lucide.createIcons();
+    }
+
+    function renderMarkers() {
+      markersLayer.clearLayers();
+      const q = document.getElementById('searchInput').value.toLowerCase(), upMap = getStorageMap('spookymap_upvoted_v1');
+      getHousesArray().forEach(h => {
+        if (!passesFilter(h, q)) return;
+        const isOut = h.status === 'out', tIdx = trailIds.indexOf(h.id), inT = tIdx >= 0, vis = isVillaVisited(h.id), mine = isMyHouse(h), liked = !!upMap[h.id], safeId = escapeHtml(h.id), rInfo = getHouseRatingSummary(h);
+        const icon = L.divIcon({ className: '', html: `<div class="custom-pin ${isOut ? 'pin-out-of-candy' : ''} ${vis ? 'pin-visited' : ''} ${inT ? 'pin-in-trail' : ''}"><span>${isOut ? '💤' : escapeHtml(h.icon)}</span>${inT ? `<div class="trail-badge">${tIdx + 1}</div>` : ''}${vis ? `<div class="visited-badge">✓</div>` : ''}</div>`, iconSize: [38, 38], iconAnchor: [19, 19], popupAnchor: [0, -20] });
+        const ownHtml = mine ? `<div class="pt-2 border-t border-white/[0.08] flex items-center justify-between gap-1.5"><span class="text-[10px] font-semibold text-orange-300">🔑 Your Villa:</span><div class="flex gap-1"><button onclick="startMoveHouseMode('${safeId}')" class="px-2 py-1 rounded-lg bg-zinc-800 text-zinc-200 text-[10px] font-semibold">📍 Move Pin</button><button onclick="deleteMyHouse('${safeId}')" class="px-2 py-1 rounded-lg bg-red-500/15 text-red-300 border border-red-500/30 text-[10px] font-semibold">🗑️ Remove</button></div></div>` : '';
+        const popupHtml = `<div class="text-left">${h.image ? `<img src="${h.image}" class="w-full h-28 object-cover border-b border-white/10" />` : ''}<div class="p-3 space-y-2"><div class="flex items-center justify-between gap-1"><span class="text-[10px] font-semibold uppercase text-orange-400 truncate">${escapeHtml(h.community)}</span>${getStatusBadgeHtml(h.status)}</div><div class="flex items-center justify-between gap-1"><h3 class="font-semibold text-xs text-white truncate">${escapeHtml(h.icon)} ${escapeHtml(h.title)}</h3><span class="text-[10px] font-semibold text-amber-400 shrink-0">${rInfo.count > 0 ? rInfo.label : '⭐ New'}</span></div><p class="text-[11px] text-zinc-400 leading-relaxed">${escapeHtml(h.desc)}</p><div class="pt-2 border-t border-white/[0.08] flex flex-wrap items-center justify-between gap-1"><button onclick="upvoteHouse('${safeId}')" class="px-2 py-1.5 rounded-lg ${liked ? 'bg-orange-500/20 text-orange-300' : 'bg-zinc-800 text-zinc-200'} text-[11px] font-medium">🎃 ${h.likes || 0}</button><button onclick="toggleVisitedVilla('${safeId}')" class="px-2 py-1.5 rounded-lg ${vis ? 'bg-purple-500 text-white font-bold' : 'bg-zinc-800 text-purple-300'} text-[11px]">${vis ? '✅ Visited (Undo)' : '☑️ Visit'}</button><button onclick="toggleTrailStop('${safeId}')" class="px-2 py-1.5 rounded-lg ${inT ? 'bg-emerald-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-emerald-300'} text-[11px]">${inT ? `✓ #${tIdx + 1}` : '+ Trail'}</button><button onclick="openReviewsModal('${safeId}')" class="px-2 py-1.5 rounded-lg bg-zinc-800 text-amber-300 text-[11px] font-semibold">💬 (${rInfo.count})</button><a href="https://www.google.com/maps/dir/?api=1&destination=${h.lat},${h.lng}" target="_blank" rel="noopener noreferrer" class="px-2 py-1.5 rounded-lg bg-orange-500 text-zinc-950 font-semibold text-[11px]">Go ↗</a></div>${ownHtml}</div></div>`;
+        const m = L.marker([h.lat, h.lng], { icon }).bindPopup(popupHtml);
+        m.on('click', playClickSfx); m.addTo(markersLayer);
+      });
+    }
+
+    function renderHouseList() {
+      const listEl = document.getElementById('houseList'), q = document.getElementById('searchInput').value.toLowerCase(), filtered = getHousesArray().filter(h => passesFilter(h, q));
+      document.getElementById('houseCount').textContent = filtered.length; document.getElementById('mobileCount').textContent = filtered.length;
+      if (!filtered.length) { listEl.innerHTML = `<div class="text-center py-12 px-4 text-xs text-zinc-500">No Halloween houses found. Tap "+ Add" to add your villa!</div>`; return; }
+      listEl.innerHTML = filtered.map(h => {
+        const rInfo = getHouseRatingSummary(h), tIdx = trailIds.indexOf(h.id), inT = tIdx >= 0, vis = isVillaVisited(h.id), mine = isMyHouse(h), safeId = escapeHtml(h.id);
+        return `<div onclick="playClickSfx(); focusHouse('${safeId}')" class="bg-zinc-900/60 hover:bg-zinc-900 border ${vis ? 'border-purple-500/40' : inT ? 'border-emerald-500/40' : 'border-white/[0.06]'} rounded-xl p-2.5 cursor-pointer space-y-2"><div class="flex gap-3 items-start">${h.image ? `<img src="${h.image}" class="w-12 h-12 rounded-lg object-cover shrink-0 border border-white/10" />` : `<div class="w-12 h-12 rounded-lg bg-zinc-950 border border-white/[0.06] flex items-center justify-center text-xl shrink-0">${escapeHtml(h.icon)}</div>`}<div class="flex-1 min-w-0"><div class="flex items-center justify-between gap-1"><span class="text-[10px] font-medium text-orange-400 truncate">${escapeHtml(h.community)} ${mine ? '• 🔑 Mine' : ''}</span>${getStatusBadgeHtml(h.status)}</div><h4 class="text-xs font-semibold text-zinc-100 truncate mt-0.5">${escapeHtml(h.title)}</h4><p class="text-[11px] text-zinc-400 line-clamp-1 mt-0.5">${escapeHtml(h.desc)}</p></div></div><div class="pt-1.5 border-t border-white/[0.05] flex items-center justify-between gap-1 text-[10px]"><div class="flex items-center gap-1.5 text-zinc-400"><span>🎃 ${h.likes || 0}</span><span>•</span><span class="text-amber-400 font-semibold">${rInfo.count > 0 ? rInfo.label : '⭐ Rate'}</span></div><div class="flex items-center gap-1"><button onclick="event.stopPropagation(); toggleVisitedVilla('${safeId}')" class="px-2 py-0.5 rounded-md ${vis ? 'bg-purple-500 text-white font-bold' : 'bg-zinc-800 text-purple-300'}">${vis ? '✅ Visited' : '☑️ Visit'}</button><button onclick="event.stopPropagation(); toggleTrailStop('${safeId}')" class="px-2 py-0.5 rounded-md ${inT ? 'bg-emerald-500 text-zinc-950 font-bold' : 'bg-zinc-800 text-emerald-300'}">${inT ? `✓ #${tIdx + 1}` : '+ Trail'}</button><button onclick="event.stopPropagation(); playClickSfx(); openReviewsModal('${safeId}')" class="px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-200">💬</button></div></div>${mine ? `<div class="pt-1.5 border-t border-white/[0.05] flex items-center justify-between text-[10px]"><span class="text-orange-300 font-semibold">🔑 Your Villa:</span><div class="flex gap-1.5"><button onclick="event.stopPropagation(); startMoveHouseMode('${safeId}')" class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-200 font-semibold">📍 Move Pin</button><button onclick="event.stopPropagation(); deleteMyHouse('${safeId}')" class="px-2 py-0.5 rounded bg-red-500/15 text-red-300 font-semibold">🗑️ Remove</button></div></div>` : ''}</div>`;
+      }).join('');
+    }
+
+    function passesFilter(h, q) {
+      const comm = document.getElementById('communityFilterSelect') ? document.getElementById('communityFilterSelect').value : 'all';
+      if (comm !== 'all' && h.community !== comm) return false;
+      if (!((h.title || '').toLowerCase().includes(q) || (h.community || '').toLowerCase().includes(q) || (h.desc || '').toLowerCase().includes(q))) return false;
+      if (currentFilter === 'candy') return h.status !== 'out';
+      if (currentFilter === 'visited') return isVillaVisited(h.id);
+      if (currentFilter === 'mine') return isMyHouse(h);
+      if (currentFilter === 'allergy') return (h.tags || []).includes('allergy');
+      return true;
+    }
+
+    // REVIEWS & CANDY REPORTER
+    function openReviewsModal(id) { activeReviewHouseId = id; selectStarRating(5, false); document.getElementById('reviewCandyReport').value = ''; renderReviewsModalContent(id); document.getElementById('reviewsModal').classList.remove('hidden'); lucide.createIcons(); }
+    function closeReviewsModal() { activeReviewHouseId = null; document.getElementById('reviewsModal').classList.add('hidden'); }
+    function selectStarRating(s, sound) { currentSelectedStars = Math.min(5, Math.max(1, Number(s) || 5)); if (sound) playStarSfx(currentSelectedStars, false); document.querySelectorAll('#starSelector .star-btn').forEach((b, i) => { b.style.opacity = i < currentSelectedStars ? '1' : '0.25'; }); document.getElementById('selectedStarText').textContent = `${currentSelectedStars} / 5 Stars`; }
+
+    function renderReviewsModalContent(id) {
+      const h = housesMap[id]; if (!h) return;
+      document.getElementById('revModalComm').textContent = h.community;
+      document.getElementById('revModalTitle').textContent = `${h.icon} ${h.title}`;
+      document.getElementById('revCurrentStatusBadge').innerHTML = getStatusBadgeHtml(h.status);
+      ['plenty', 'low', 'out'].forEach(st => { const b = document.getElementById(`statusBtn-${st}`); if (b) b.className = h.status === st ? 'py-2 px-2 rounded-xl bg-orange-500 text-zinc-950 font-bold text-[11px]' : 'py-2 px-2 rounded-xl bg-zinc-950 border border-white/10 text-zinc-300 font-semibold text-[11px]'; });
+      const rInfo = getHouseRatingSummary(h);
+      document.getElementById('revModalAvgSummary').textContent = rInfo.count > 0 ? `${rInfo.avg} ⭐ (${rInfo.count} reviews)` : 'Be the first to rate!';
+      const listEl = document.getElementById('reviewsListContainer'), revs = [...(h.reviews || [])].sort((a, b) => (b.time || 0) - (a.time || 0));
+      if (!revs.length) { listEl.innerHTML = `<div class="p-4 rounded-xl bg-zinc-900/40 text-center text-xs text-zinc-500">No comments yet!</div>`; return; }
+      listEl.innerHTML = revs.map(r => `<div class="p-3 rounded-xl bg-zinc-900/80 border border-white/[0.06] space-y-1"><div class="flex items-center justify-between"><span class="text-xs font-bold text-white truncate">${escapeHtml(r.author || 'Trick-or-Treater')}</span><span class="text-[10px]">${'⭐'.repeat(Math.min(5, Math.max(1, Number(r.rating) || 5)))}</span></div><p class="text-xs text-zinc-300 break-words">${escapeHtml(r.text)}</p></div>`).join('');
+    }
+
+    async function reportCandyStatus(nextStatus) {
+      if (!activeReviewHouseId || !housesMap[activeReviewHouseId] || !ALLOWED_STATUS.includes(nextStatus)) return;
+      playClickSfx(); housesMap[activeReviewHouseId].status = nextStatus;
+      renderReviewsModalContent(activeReviewHouseId); renderUI();
+      await fetch(`${SUPABASE_REST_URL}/houses?id=eq.${encodeURIComponent(activeReviewHouseId)}`, { method: 'PATCH', headers: SUPABASE_HEADERS, body: JSON.stringify({ status: nextStatus }) });
+    }
+
+    async function submitHouseReview(e) {
+      e.preventDefault();
+      if (!activeReviewHouseId || !housesMap[activeReviewHouseId]) return;
+      const author = document.getElementById('reviewAuthorInput').value.trim().slice(0, 28), comment = document.getElementById('reviewCommentInput').value.trim().slice(0, 160), candy = document.getElementById('reviewCandyReport').value;
+      if (isUnsafeText(author) || isUnsafeText(comment)) return alert('⚠️ Please keep your nickname and comment family-friendly!');
+      const btn = document.getElementById('submitReviewBtn'); btn.disabled = true; btn.textContent = 'Posting...';
+      try {
+        const h = housesMap[activeReviewHouseId], newRev = { type: 'review', author: author || 'Trick-or-Treater', rating: currentSelectedStars, text: comment, candy: ALLOWED_STATUS.includes(candy) ? candy : '', time: Date.now() };
+        const nextRaw = [...(h.rawTags || []).slice(-49), newRev], nextSt = ALLOWED_STATUS.includes(candy) ? candy : h.status;
+        const res = await fetch(`${SUPABASE_REST_URL}/houses?id=eq.${encodeURIComponent(activeReviewHouseId)}`, { method: 'PATCH', headers: SUPABASE_HEADERS, body: JSON.stringify({ tags: nextRaw, status: nextSt }) });
+        btn.disabled = false; btn.textContent = 'Post Rating & Comment';
+        if (res.ok) { playStarSfx(currentSelectedStars, true); h.rawTags = nextRaw; h.reviews = [...(h.reviews || []), newRev]; h.status = nextSt; document.getElementById('reviewCommentInput').value = ''; renderReviewsModalContent(activeReviewHouseId); renderUI(); }
+      } catch (_) { btn.disabled = false; btn.textContent = 'Post Rating & Comment'; }
+    }
+
+    // ADD HOUSE & MAP CLICK
+    function startAddHouseMode() { isAddingHouse = true; movingHouseId = null; document.getElementById('placementBannerText').textContent = 'Tap your villa inside the UAE'; document.getElementById('placementBanner').classList.remove('hidden'); document.getElementById('map').style.cursor = 'crosshair'; if (window.innerWidth < 640) document.getElementById('sidebar').classList.add('-translate-x-full'); }
+    function cancelAddHouseMode() { isAddingHouse = false; movingHouseId = null; document.getElementById('placementBanner').classList.add('hidden'); document.getElementById('map').style.cursor = ''; }
+    function toggleCustomCommunityInput() { const c = document.getElementById('formCommunity').value === '__custom__'; document.getElementById('customCommunityWrapper').classList.toggle('hidden', !c); document.getElementById('formCustomCommunity').required = c; }
+    function detectClosestUAECommunity(lat, lng) {
+      let best = 'Mudon', minD = Infinity;
+      Object.values(COORDS).forEach(e => { if (!e.communityName) return; const d = (lat - e.center[0]) ** 2 + (lng - e.center[1]) ** 2; if (d < minD) { minD = d; best = e.communityName; } });
+      return minD < 0.0065 ? best : '__custom__';
+    }
+
+    map.on('click', async function(e) {
+      if (!isAddingHouse && !movingHouseId) return;
+      const { lat, lng } = e.latlng;
+      if (!isInsideUAE(lat, lng)) return alert('📍 Please tap a location inside the United Arab Emirates.');
+      if (movingHouseId) {
+        const id = movingHouseId, h = housesMap[id]; cancelAddHouseMode();
+        if (!h || !isMyHouse(h)) return;
+        h.lat = Number(lat.toFixed(6)); h.lng = Number(lng.toFixed(6));
+        playAddVillaSfx(); renderUI();
+        await fetch(`${SUPABASE_REST_URL}/houses?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', headers: SUPABASE_HEADERS, body: JSON.stringify({ lat: h.lat, lng: h.lng }) });
+        return;
+      }
+      playClickSfx(); cancelAddHouseMode();
+      document.getElementById('formLat').value = lat.toFixed(6); document.getElementById('formLng').value = lng.toFixed(6);
+      const det = detectClosestUAECommunity(lat, lng), sel = document.getElementById('formCommunity');
+      sel.value = [...sel.options].some(o => o.value === det) ? det : '__custom__';
+      toggleCustomCommunityInput(); document.getElementById('houseModal').classList.remove('hidden');
+    });
+
+    function handleImageUpload(ev) {
+      const f = ev.target.files[0]; if (!f) return;
+      const r = new FileReader();
+      r.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          const c = document.createElement('canvas'), sc = Math.min(1, 440 / img.width);
+          c.width = img.width * sc; c.height = img.height * sc;
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          uploadedBase64Image = sanitizeImageSrc(c.toDataURL('image/jpeg', 0.62));
+          document.getElementById('imagePreview').src = uploadedBase64Image;
+          document.getElementById('imagePreviewContainer').classList.remove('hidden');
+        };
+        img.src = e.target.result;
+      };
+      r.readAsDataURL(f);
+    }
+    function clearUploadedImage() { uploadedBase64Image = ''; document.getElementById('formImageFile').value = ''; document.getElementById('imagePreviewContainer').classList.add('hidden'); }
+    function closeHouseModal() { document.getElementById('houseModal').classList.add('hidden'); document.getElementById('houseForm').reset(); clearUploadedImage(); }
+
+    async function saveHouse(e) {
+      e.preventDefault();
+      const lat = parseFloat(document.getElementById('formLat').value), lng = parseFloat(document.getElementById('formLng').value);
+      if (!isInsideUAE(lat, lng)) return alert('📍 Location must be inside the UAE.');
+      const selComm = document.getElementById('formCommunity').value, finalComm = (selComm === '__custom__' ? (document.getElementById('formCustomCommunity').value.trim() || 'UAE') : selComm).slice(0, 45);
+      const title = document.getElementById('formTitle').value.trim().slice(0, 45), desc = document.getElementById('formDesc').value.trim().slice(0, 180);
+      if (isUnsafeText(finalComm) || isUnsafeText(title) || isUnsafeText(desc)) return alert('⚠️ Family Filter: Please remove inappropriate language.');
+      const btn = document.getElementById('submitVillaBtn'); btn.disabled = true; btn.textContent = 'Publishing...';
+      const newId = 'villa_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), tags = [{ type: 'owner', sig: computeOwnerSignature(newId) }];
+      if (document.getElementById('tagAllergy').checked) tags.push('allergy');
+      if (document.getElementById('tagScary').checked) tags.push('scary');
+      if (document.getElementById('tagToddler').checked) tags.push('toddler');
+      if (document.getElementById('tagPhoto').checked) tags.push('photo');
+      const rowData = { id: newId, community: finalComm, title, lat, lng, icon: document.getElementById('formIcon').value, status: document.getElementById('formStatus').value, description: desc, tags, likes: 1, image: sanitizeImageSrc(uploadedBase64Image), created_at: Date.now() };
+      try {
+        const res = await fetch(`${SUPABASE_REST_URL}/houses`, { method: 'POST', headers: SUPABASE_HEADERS, body: JSON.stringify(rowData) });
+        btn.disabled = false; btn.textContent = 'Publish Villa';
+        if (res.ok) {
+          const m = getStorageMap('spookymap_my_villas_v1'); m[newId] = true; setStorageMap('spookymap_my_villas_v1', m);
+          playAddVillaSfx(); runCandyRainFX(35); housesMap[rowData.id] = formatRow(rowData);
+          updateSidebarCommunityFilterOptions(); closeHouseModal(); renderUI();
+          map.flyTo([rowData.lat, rowData.lng], 17, { animate: true, duration: 1.15 });
+        }
+      } catch (_) { btn.disabled = false; btn.textContent = 'Publish Villa'; }
+    }
+
+    async function upvoteHouse(id) {
+      const h = housesMap[id]; if (!h) return;
+      const u = getStorageMap('spookymap_upvoted_v1'); if (u[id]) return alert('🎃 You already upvoted this villa!');
+      u[id] = true; setStorageMap('spookymap_upvoted_v1', u);
+      playClickSfx(); h.likes = (h.likes || 0) + 1; renderUI();
+      await fetch(`${SUPABASE_REST_URL}/houses?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', headers: SUPABASE_HEADERS, body: JSON.stringify({ likes: h.likes }) });
+    }
+
+    function flyToArea(a) { const t = COORDS[a] || COORDS.uae; map.flyTo(t.center, t.zoom, { animate: true, duration: 1.25 }); }
+    function focusHouse(id) { const h = housesMap[id]; if (!h) return; if (window.innerWidth < 640) toggleMobileDrawer(); map.flyTo([h.lat, h.lng], 17.2, { animate: true, duration: 1.1 }); }
+    function setFilter(f) { currentFilter = f; document.querySelectorAll('.filter-pill').forEach(el => { el.className = 'filter-pill px-2.5 py-1 rounded-lg bg-zinc-900 text-zinc-400 border border-white/[0.05] shrink-0'; }); const act = document.getElementById(`filter-${f}`); if (act) act.className = 'filter-pill px-2.5 py-1 rounded-lg bg-zinc-800 text-white border border-white/10 font-medium shrink-0'; renderUI(); }
+    function setMapLayer(t) { map.removeLayer(darkVoyagerLayer); map.removeLayer(lightVoyagerLayer); map.removeLayer(plainSatelliteLayer); ['dark', 'voyager', 'satellite'].forEach(id => { document.getElementById(`layer-${id}`).className = 'px-2.5 py-1.5 rounded-lg text-zinc-400 font-medium'; }); if (t === 'dark') darkVoyagerLayer.addTo(map); else if (t === 'voyager') lightVoyagerLayer.addTo(map); else plainSatelliteLayer.addTo(map); document.getElementById(`layer-${t}`).className = 'px-2.5 py-1.5 rounded-lg bg-zinc-800 text-white font-medium'; }
+    function locateUser() {
+      if (!navigator.geolocation) return alert('Geolocation not supported.');
+      navigator.geolocation.getCurrentPosition(pos => {
+        const { latitude, longitude, accuracy } = pos.coords;
+        if (userLocationMarker) map.removeLayer(userLocationMarker);
+        if (userAccuracyCircle) map.removeLayer(userAccuracyCircle);
+        userAccuracyCircle = L.circle([latitude, longitude], { radius: Math.min(accuracy || 30, 120), color: '#3b82f6', fillOpacity: 0.12, weight: 1 }).addTo(map);
+        userLocationMarker = L.marker([latitude, longitude], { icon: L.divIcon({ className: '', html: `<div class="user-gps-dot"></div>`, iconSize: [18, 18], iconAnchor: [9, 9] }) }).addTo(map);
+        map.flyTo([latitude, longitude], 16.8, { animate: true, duration: 1.2 });
+      }, () => alert('Please enable Location Services in Settings.'));
+    }
+    function toggleMobileDrawer() { document.getElementById('sidebar').classList.toggle('-translate-x-full'); }
+
+    populateUAECommunitySelectors(); updateVolumeUI(); updateSidebarCommunityFilterOptions(); renderUI(); fetchHousesFromSupabase(); subscribeToRealtimeHousesAndAdminFX(); setInterval(fetchHousesFromSupabase, 5000);
+  </script>
+</body>
+</html>
